@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Colony Wars — Alien Planet Strategy</title>
-  <meta name="description" content="Build your colony, gather resources, and battle other commanders in this sci-fi browser strategy game." />
+  <title>Colony Wars — Low Poly Strategy</title>
+  <meta name="description" content="Build your colony, gather resources, and battle other commanders in this low poly browser strategy game." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -15,16 +15,14 @@
        AUTH SCREEN
   ═══════════════════════════════════════════════ -->
   <div id="auth-screen" class="screen active">
-    <div class="auth-bg">
-      <div class="stars" id="stars"></div>
-      <div class="nebula nebula-1"></div>
-      <div class="nebula nebula-2"></div>
+    <div class="auth-bg" id="auth-bg">
+      <!-- Low poly triangles injected by JS -->
     </div>
     <div class="auth-container">
       <div class="auth-logo">
-        <div class="logo-hex">⬡</div>
+        <div class="logo-gem"></div>
         <h1 class="logo-title">COLONY <span>WARS</span></h1>
-        <p class="logo-tagline">Survive · Build · Conquer</p>
+        <p class="logo-tagline">Build · Conquer · Survive</p>
       </div>
 
       <div class="auth-card glass">
@@ -36,33 +34,33 @@
         <!-- Login Form -->
         <form id="login-form" class="auth-form active" autocomplete="on">
           <div class="input-group">
-            <label for="login-email">COMMANDER EMAIL</label>
-            <input type="email" id="login-email" name="email" placeholder="commander@colony.space" required autocomplete="email" />
+            <label for="login-email">Commander Email</label>
+            <input type="email" id="login-email" name="email" placeholder="commander@colony.com" required autocomplete="email" />
           </div>
           <div class="input-group">
-            <label for="login-password">ACCESS CODE</label>
+            <label for="login-password">Access Code</label>
             <input type="password" id="login-password" name="password" placeholder="••••••••" required autocomplete="current-password" />
           </div>
           <div id="login-error" class="auth-error" role="alert"></div>
-          <button type="submit" class="btn-primary btn-full" id="login-btn">ENTER BASE</button>
+          <button type="submit" class="btn-primary btn-full" id="login-btn">⚔ ENTER BASE</button>
         </form>
 
         <!-- Register Form -->
         <form id="register-form" class="auth-form" autocomplete="on">
           <div class="input-group">
-            <label for="reg-name">COMMANDER NAME</label>
+            <label for="reg-name">Commander Name</label>
             <input type="text" id="reg-name" name="displayName" placeholder="Commander Zara" required autocomplete="name" />
           </div>
           <div class="input-group">
-            <label for="reg-email">COMMANDER EMAIL</label>
-            <input type="email" id="reg-email" name="email" placeholder="commander@colony.space" required autocomplete="email" />
+            <label for="reg-email">Commander Email</label>
+            <input type="email" id="reg-email" name="email" placeholder="commander@colony.com" required autocomplete="email" />
           </div>
           <div class="input-group">
-            <label for="reg-password">ACCESS CODE</label>
+            <label for="reg-password">Access Code</label>
             <input type="password" id="reg-password" name="password" placeholder="Min. 6 characters" required autocomplete="new-password" />
           </div>
           <div id="register-error" class="auth-error" role="alert"></div>
-          <button type="submit" class="btn-primary btn-full" id="register-btn">ESTABLISH COLONY</button>
+          <button type="submit" class="btn-primary btn-full" id="register-btn">🏰 ESTABLISH COLONY</button>
         </form>
       </div>
     </div>
@@ -76,7 +74,7 @@
     <!-- Resource / Top Bar -->
     <header class="resource-bar glass">
       <div class="commander-badge">
-        <span class="cmdr-hex">⬡</span>
+        <div class="cmdr-hex">⚔</div>
         <span id="commander-name" class="cmdr-name">Commander</span>
       </div>
 
@@ -118,9 +116,9 @@
     <div class="game-layout">
 
       <!-- Left Sidebar: Build Panel -->
-      <aside class="panel build-panel glass" id="build-panel">
+      <aside class="panel build-panel" id="build-panel">
         <div class="panel-header">
-          <h2 class="panel-title">STRUCTURES</h2>
+          <h2 class="panel-title">🏗 Structures</h2>
           <button class="btn-icon-cancel" id="cancel-build-btn" onclick="cancelBuild()" style="display:none" title="Cancel placement">✕</button>
         </div>
         <div class="build-list" id="build-list">
@@ -130,7 +128,7 @@
         <div class="panel-divider"></div>
 
         <div class="panel-section">
-          <h3 class="section-title">RECRUIT</h3>
+          <h3 class="section-title">⚔ Recruit</h3>
           <div class="unit-list" id="unit-list">
             <!-- Populated by JS -->
           </div>
@@ -139,7 +137,7 @@
         <div class="panel-divider"></div>
 
         <div class="panel-section">
-          <h3 class="section-title">ARMY</h3>
+          <h3 class="section-title">🪖 Army</h3>
           <div class="army-display" id="army-display">
             <p class="hint-text">No units trained.</p>
           </div>
@@ -159,9 +157,9 @@
       </main>
 
       <!-- Right Sidebar: Intel Panel -->
-      <aside class="panel info-panel glass" id="info-panel">
+      <aside class="panel info-panel" id="info-panel">
         <div class="panel-header">
-          <h2 class="panel-title">INTEL</h2>
+          <h2 class="panel-title">🔍 Intel</h2>
         </div>
         <div id="selected-info">
           <p class="hint-text">Click a building to inspect it. Click an empty cell while a structure is selected to place it.</p>
@@ -170,7 +168,7 @@
         <div class="panel-divider"></div>
 
         <div class="panel-section">
-          <h3 class="section-title">DEFENSE LOG</h3>
+          <h3 class="section-title">📋 Defense Log</h3>
           <div class="defense-log" id="defense-log">
             <p class="hint-text">No attacks recorded.</p>
           </div>
@@ -245,10 +243,8 @@
        LOADING OVERLAY
   ═══════════════════════════════════════════════ -->
   <div id="loading-overlay" class="loading-overlay active">
-    <div class="loading-content">
-      <div class="loading-hex">⬡</div>
-      <p class="loading-text">Establishing Connection...</p>
-    </div>
+    <div class="loading-hex"></div>
+    <p class="loading-text">Establishing Colony...</p>
   </div>
 
   <!-- Notification toast (injected by JS) -->

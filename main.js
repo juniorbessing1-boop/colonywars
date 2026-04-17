@@ -56,21 +56,44 @@ const FOG_RANGE = 3;
 // Stars Background (auth screen)
 // ════════════════════════════════════════════════════════════════════════════
 
-(function spawnStars() {
-  const container = document.getElementById('stars');
+// ════════════════════════════════════════════════════════════════════════════
+// Low Poly Auth Background (floating triangles)
+// ════════════════════════════════════════════════════════════════════════════
+
+(function spawnPolyBg() {
+  const container = document.getElementById('auth-bg');
   if (!container) return;
-  for (let i = 0; i < 220; i++) {
-    const s = document.createElement('div');
-    s.className = 'star';
-    const size = Math.random() * 2 + 0.5;
-    s.style.cssText = `
-      left:${Math.random() * 100}%;
-      top:${Math.random() * 100}%;
+
+  const COLOURS = [
+    '#a5d6a7','#81c784','#66bb6a','#43a047',
+    '#c8e6c9','#ffd600','#ffb300','#fb8c00',
+    '#fff59d','#ffffff',
+  ];
+
+  for (let i = 0; i < 22; i++) {
+    const el  = document.createElement('div');
+    el.className = 'lp-poly';
+    const size = 60 + Math.random() * 160;
+    const col  = COLOURS[Math.floor(Math.random() * COLOURS.length)];
+    const rot  = (Math.random() * 360).toFixed(1);
+    const clipTypes = [
+      'polygon(50% 0%, 100% 100%, 0% 100%)',           // triangle up
+      'polygon(50% 100%, 0% 0%, 100% 0%)',             // triangle down
+      'polygon(0 50%, 50% 0%, 100% 50%, 50% 100%)',    // diamond
+      'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)', // hex
+    ];
+    const clip = clipTypes[Math.floor(Math.random() * clipTypes.length)];
+    el.style.cssText = `
+      left:${(Math.random() * 110 - 5).toFixed(1)}%;
+      top:${(Math.random() * 110 - 5).toFixed(1)}%;
       width:${size}px; height:${size}px;
-      animation-delay:${(Math.random() * 4).toFixed(2)}s;
-      animation-duration:${(2 + Math.random() * 4).toFixed(2)}s;
+      background:${col};
+      clip-path:${clip};
+      --rot:${rot}deg;
+      --dur:${(6 + Math.random() * 10).toFixed(1)}s;
+      animation-delay:${(Math.random() * 6).toFixed(2)}s;
     `;
-    container.appendChild(s);
+    container.appendChild(el);
   }
 })();
 
@@ -248,30 +271,68 @@ function renderGrid() {
 }
 
 /** Re-render a single cell's inner DOM without rebuilding the whole grid. */
-function updateCell(index) {
+function updateCell(index, animate = false) {
   const el = document.querySelector(`[data-idx="${index}"]`);
   if (!el) return;
   el.classList.remove('has-building', ...Object.keys(BUILDINGS).map(k => `building-${k}`));
-  populateCellDOM(el, index);
+  populateCellDOM(el, index, animate);
   updateFogOfWar();
 }
 
-function populateCellDOM(cellEl, index) {
+/**
+ * Map each building id to its DOM shape structure.
+ * Returns the inner HTML for .cell-building.
+ */
+function buildingShapeHTML(buildingId, level, hpPct) {
+  const hpClass = hpPct > 60 ? '' : hpPct > 25 ? ' hp-mid' : ' hp-low';
+  const hpBar   = `<div class="building-hp-bar"><div class="hp-fill${hpClass}" style="width:${hpPct.toFixed(1)}%"></div></div>`;
+  const lvlBadge= `<div class="building-level">L${level}</div>`;
+
+  const shapes = {
+    cc: `
+      <div class="bshape">
+        <div class="bshape-crown"></div>
+      </div>`,
+    mine: `
+      <div class="bshape">
+        <div class="bshape-drill"></div>
+      </div>`,
+    solar: `<div class="bshape"></div>`,
+    oxy: `
+      <div class="bshape">
+        <div class="bshape-dome"></div>
+      </div>`,
+    depot: `<div class="bshape"></div>`,
+    turret: `
+      <div class="bshape">
+        <div class="bshape-barrel"></div>
+      </div>`,
+    barracks: `
+      <div class="bshape">
+        <div class="bshape-flag"></div>
+      </div>`,
+  };
+
+  return (shapes[buildingId] || `<div class="bshape"></div>`) + lvlBadge + hpBar;
+}
+
+function populateCellDOM(cellEl, index, animate = false) {
   const cell = gameState.baseLayout[index];
   if (!cell) { cellEl.innerHTML = ''; return; }
 
-  const bDef = BUILDINGS[cell.buildingId];
+  const bDef  = BUILDINGS[cell.buildingId];
   if (!bDef) return;
 
   const hpPct = (cell.hp / (cell.maxHp || bDef.hp[cell.level - 1])) * 100;
   cellEl.classList.add('has-building', `building-${cell.buildingId}`);
+
+  // Extra class for CC glow animation
+  const extraClass = cell.buildingId === 'cc' ? ' building-cc-anim' : '';
+  const animClass  = animate ? ' building-construct' : '';
+
   cellEl.innerHTML = `
-    <div class="cell-building" style="--bcolor:${bDef.color}">
-      <div class="building-icon">${bDef.emoji}</div>
-      <div class="building-level">L${cell.level}</div>
-      <div class="building-hp-bar">
-        <div class="hp-fill" style="width:${hpPct.toFixed(1)}%"></div>
-      </div>
+    <div class="cell-building${extraClass}${animClass}">
+      ${buildingShapeHTML(cell.buildingId, cell.level, hpPct)}
     </div>`;
 }
 
@@ -318,7 +379,7 @@ function onCellClick(index) {
     // ── Place building ──────────────────────────────────────────────────
     const result = placeBuilding(gameState, index, selectedBuildingId);
     if (result.success) {
-      updateCell(index);
+      updateCell(index, true); // true = play construction animation
       renderResourceBar();
       buildBuildMenu();
       scheduleAutoSave();
@@ -797,19 +858,119 @@ window.startBattle = function () {
   requestAnimationFrame(loop);
 };
 
+// ════════════════════════════════════════════════════════════════════════════
+// Low Poly Canvas Helpers
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Low poly terrain colours (alternating tiles) */
+const LP_TILE_A = '#7cb87c';
+const LP_TILE_B = '#8dcf8d';
+const LP_TILE_C = '#6aa56a';
+
+/** Draw a low poly terrain grid background on canvas. */
+function drawLPTerrain(ctx, W, cellSize) {
+  for (let row = 0; row < GRID_SIZE; row++) {
+    for (let col = 0; col < GRID_SIZE; col++) {
+      const x = col * cellSize, y = row * cellSize;
+      const idx = row * GRID_SIZE + col;
+      ctx.fillStyle = (idx % 3 === 0) ? LP_TILE_C : (idx % 2 === 0) ? LP_TILE_A : LP_TILE_B;
+      ctx.fillRect(x, y, cellSize, cellSize);
+      // Tile border
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(x + 0.25, y + 0.25, cellSize - 0.5, cellSize - 0.5);
+    }
+  }
+}
+
+/**
+ * Draw a single low poly building block on canvas.
+ * Uses a 3-tone approach: front face, right side face (shadow), top face.
+ */
+function drawLPBuilding(ctx, x, y, cellSize, color, alive) {
+  const pad  = Math.floor(cellSize * 0.12);
+  const bx   = x + pad,     by   = y + pad;
+  const bw   = cellSize - pad * 2 - Math.floor(cellSize * 0.18);
+  const bh   = cellSize - pad * 2;
+  const side = Math.floor(cellSize * 0.18); // right-face width
+  const top  = Math.floor(cellSize * 0.20); // top-face height
+
+  if (!alive) {
+    // Rubble — scattered grey polygons
+    ctx.fillStyle = 'rgba(100,100,100,0.6)';
+    ctx.fillRect(bx + 2, by + bh * 0.5, bw * 0.5, bh * 0.45);
+    ctx.fillStyle = 'rgba(80,80,80,0.5)';
+    ctx.fillRect(bx + bw * 0.4, by + bh * 0.6, bw * 0.5, bh * 0.35);
+    ctx.fillStyle = 'rgba(60,60,60,0.4)';
+    ctx.fillRect(bx + bw * 0.2, by + bh * 0.72, bw * 0.3, bh * 0.2);
+    return;
+  }
+
+  // ── Front face ──
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.rect(bx, by + top, bw, bh - top);
+  ctx.fill();
+
+  // ── Right / shadow face ──
+  ctx.fillStyle = shadeColor(color, -38);
+  ctx.beginPath();
+  ctx.moveTo(bx + bw,       by + top);
+  ctx.lineTo(bx + bw + side, by + top + side * 0.5);
+  ctx.lineTo(bx + bw + side, by + bh + side * 0.5);
+  ctx.lineTo(bx + bw,        by + bh);
+  ctx.closePath();
+  ctx.fill();
+
+  // ── Top face ──
+  ctx.fillStyle = shadeColor(color, 30);
+  ctx.beginPath();
+  ctx.moveTo(bx,             by + top);
+  ctx.lineTo(bx + side,      by);
+  ctx.lineTo(bx + bw + side, by);
+  ctx.lineTo(bx + bw,        by + top);
+  ctx.closePath();
+  ctx.fill();
+
+  // Subtle top edge highlight
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(bx, by + top); ctx.lineTo(bx + side, by); ctx.lineTo(bx + bw + side, by);
+  ctx.stroke();
+}
+
+/** Lighten (+) or darken (-) a CSS hex colour by amount. */
+function shadeColor(hex, amount) {
+  const num = parseInt(hex.replace('#',''), 16);
+  const r   = Math.min(255, Math.max(0, (num >> 16) + amount));
+  const g   = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amount));
+  const b   = Math.min(255, Math.max(0, (num & 0xff) + amount));
+  return `rgb(${r},${g},${b})`;
+}
+
+/** Map of building id → flat canvas colour (friendlier than bDef.color for LP) */
+const LP_COLORS = {
+  cc:       '#ffd600',
+  mine:     '#ff8f00',
+  solar:    '#fdd835',
+  oxy:      '#66bb6a',
+  depot:    '#42a5f5',
+  turret:   '#ef5350',
+  barracks: '#ab47bc',
+};
+
 /** Draw a static base grid (enemy base or initial view). */
 function drawBaseOnCanvas(ctx, layout, cellSize) {
   const W = GRID_SIZE * cellSize;
-  ctx.fillStyle = '#080d1a';
-  ctx.fillRect(0, 0, W, W);
 
-  // Grid lines
-  ctx.strokeStyle = 'rgba(0,229,255,0.07)';
-  ctx.lineWidth   = 0.5;
-  for (let i = 0; i <= GRID_SIZE; i++) {
-    ctx.beginPath(); ctx.moveTo(i * cellSize, 0);   ctx.lineTo(i * cellSize, W); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, i * cellSize);   ctx.lineTo(W, i * cellSize); ctx.stroke();
-  }
+  // Low poly terrain
+  drawLPTerrain(ctx, W, cellSize);
+
+  // Outer border
+  ctx.strokeStyle = '#5a9e5a';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(0, 0, W, W);
 
   Object.entries(layout).forEach(([idx, cell]) => {
     const ci   = parseInt(idx, 10);
@@ -819,160 +980,152 @@ function drawBaseOnCanvas(ctx, layout, cellSize) {
     if (!bDef) return;
 
     const x = col * cellSize, y = row * cellSize;
+    const color = LP_COLORS[cell.buildingId] || bDef.color;
 
-    ctx.fillStyle   = bDef.color + '28';
-    ctx.fillRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
-    ctx.strokeStyle = bDef.color;
-    ctx.lineWidth   = 1.5;
-    ctx.strokeRect( x + 2, y + 2, cellSize - 4, cellSize - 4);
+    drawLPBuilding(ctx, x, y, cellSize, color, true);
 
-    ctx.font        = `${Math.floor(cellSize * 0.45)}px serif`;
-    ctx.textAlign   = 'center';
-    ctx.textBaseline= 'middle';
+    // Level badge
+    ctx.font        = `bold ${Math.floor(cellSize * 0.20)}px Nunito,Inter,sans-serif`;
     ctx.fillStyle   = '#fff';
-    ctx.fillText(bDef.emoji, x + cellSize / 2, y + cellSize / 2);
-
-    ctx.font        = `bold ${Math.floor(cellSize * 0.2)}px Inter,sans-serif`;
-    ctx.fillStyle   = bDef.color;
-    ctx.textAlign   = 'right';
-    ctx.textBaseline= 'bottom';
-    ctx.fillText(`L${cell.level}`, x + cellSize - 3, y + cellSize - 2);
+    ctx.textAlign   = 'left';
+    ctx.textBaseline= 'top';
+    ctx.fillText(`L${cell.level}`, x + 2, y + 2);
   });
 }
 
-/** Animated battle frame renderer. */
+/** Animated low poly battle frame renderer. */
 function renderBattleFrame(ctx, bs, layout) {
   const cellSize = CELL_PX;
   const W        = GRID_SIZE * cellSize;
 
-  // Background
-  ctx.fillStyle = '#080d1a';
-  ctx.fillRect(0, 0, W, W);
+  // Low poly terrain background
+  drawLPTerrain(ctx, W, cellSize);
 
-  // Grid lines
-  ctx.strokeStyle = 'rgba(0,229,255,0.06)';
-  ctx.lineWidth   = 0.5;
-  for (let i = 0; i <= GRID_SIZE; i++) {
-    ctx.beginPath(); ctx.moveTo(i * cellSize, 0); ctx.lineTo(i * cellSize, W); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, i * cellSize); ctx.lineTo(W, i * cellSize); ctx.stroke();
-  }
+  // Outer border
+  ctx.strokeStyle = '#5a9e5a';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(0, 0, W, W);
 
   // Buildings
   bs.buildings.forEach(b => {
-    const bDef = BUILDINGS[b.buildingId];
-    const x    = b.col * cellSize;
-    const y    = b.row * cellSize;
+    const x = b.col * cellSize;
+    const y = b.row * cellSize;
+    const color = LP_COLORS[b.buildingId] || '#888';
 
-    if (!b.alive) {
-      // Destroyed: draw rubble
-      ctx.fillStyle = 'rgba(255,100,0,0.12)';
-      ctx.fillRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
-      ctx.font = `${Math.floor(cellSize * 0.4)}px serif`;
-      ctx.textAlign    = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('💥', x + cellSize / 2, y + cellSize / 2);
-      return;
-    }
+    drawLPBuilding(ctx, x, y, cellSize, color, b.alive);
 
-    ctx.fillStyle   = bDef.color + '28';
-    ctx.fillRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
-    ctx.strokeStyle = bDef.color;
-    ctx.lineWidth   = 1.5;
-    ctx.strokeRect( x + 2, y + 2, cellSize - 4, cellSize - 4);
+    if (b.alive) {
+      // HP bar
+      const hpPct = Math.max(0, b.hp / b.maxHp);
+      const barW  = cellSize - 6;
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.fillRect(x + 3, y + cellSize - 5, barW, 4);
+      ctx.fillStyle = hpPct > 0.5 ? '#43a047' : hpPct > 0.25 ? '#fb8c00' : '#e53935';
+      ctx.fillRect(x + 3, y + cellSize - 5, barW * hpPct, 4);
 
-    ctx.font        = `${Math.floor(cellSize * 0.45)}px serif`;
-    ctx.textAlign   = 'center';
-    ctx.textBaseline= 'middle';
-    ctx.fillStyle   = '#fff';
-    ctx.fillText(bDef.emoji, x + cellSize / 2, y + cellSize / 2);
+      // Level badge
+      ctx.font        = `bold ${Math.floor(cellSize * 0.2)}px Nunito,Inter,sans-serif`;
+      ctx.fillStyle   = '#fff';
+      ctx.textAlign   = 'left';
+      ctx.textBaseline= 'top';
+      ctx.fillText(`L${b.level}`, x + 2, y + 2);
 
-    // HP bar
-    const hpPct  = Math.max(0, b.hp / b.maxHp);
-    const barW   = cellSize - 6;
-    ctx.fillStyle = '#222';
-    ctx.fillRect(x + 3, y + cellSize - 6, barW, 4);
-    ctx.fillStyle = hpPct > 0.5 ? '#00e676' : hpPct > 0.25 ? '#ffab00' : '#ff1744';
-    ctx.fillRect(x + 3, y + cellSize - 6, barW * hpPct, 4);
-
-    // Turret range ring
-    if (b.buildingId === 'turret') {
-      const range = BUILDINGS.turret.range[b.level - 1] * cellSize;
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, range, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,23,68,0.14)';
-      ctx.lineWidth   = 1;
-      ctx.stroke();
+      // Turret range ring
+      if (b.buildingId === 'turret') {
+        const range = BUILDINGS.turret.range[b.level - 1] * cellSize;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, range, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(239,83,80,0.22)';
+        ctx.lineWidth   = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
   });
 
-  // Projectiles
+  // Projectiles — low poly bolts (small triangles)
   bs.projectiles.forEach(p => {
     const t  = 1 - p.life;
     const px = p.x + (p.tx - p.x) * t;
     const py = p.y + (p.ty - p.y) * t;
-    ctx.beginPath();
-    ctx.arc(px, py, 3.5, 0, Math.PI * 2);
-    ctx.fillStyle   = p.color;
+    const angle = Math.atan2(p.ty - p.y, p.tx - p.x);
+    const len   = 8;
+
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(angle);
     ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle   = p.color;
+    ctx.beginPath();
+    ctx.moveTo(len, 0);
+    ctx.lineTo(-len * 0.5,  3);
+    ctx.lineTo(-len * 0.5, -3);
+    ctx.closePath();
     ctx.fill();
-    // Glow
-    ctx.shadowBlur  = 8;
-    ctx.shadowColor = p.color;
-    ctx.fill();
-    ctx.shadowBlur  = 0;
     ctx.globalAlpha = 1;
+    ctx.restore();
   });
 
-  // Units
+  // Units — low poly capsule / rhombus shape
   bs.units.forEach(unit => {
     if (!unit.alive) return;
     const uDef = UNITS[unit.unitType];
-    const r    = 7;
+    const hs = 7;  // half-size
 
-    // Drop shadow
+    // Ground shadow
+    ctx.save();
+    ctx.translate(unit.x + 2, unit.y + 3);
+    ctx.scale(1, 0.5);
     ctx.beginPath();
-    ctx.arc(unit.x + 1.5, unit.y + 2.5, r, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.arc(0, 0, hs, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.fill();
+    ctx.restore();
 
-    // Body
-    ctx.beginPath();
-    ctx.arc(unit.x, unit.y, r, 0, Math.PI * 2);
+    // Body — diamond shape (low poly)
+    ctx.save();
+    ctx.translate(unit.x, unit.y);
     ctx.fillStyle = uDef.color;
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-    ctx.lineWidth   = 1;
-    ctx.stroke();
-
-    // Glow on unit
     ctx.beginPath();
-    ctx.arc(unit.x, unit.y, r, 0, Math.PI * 2);
-    ctx.shadowBlur  = 10;
-    ctx.shadowColor = uDef.color;
-    ctx.fillStyle   = 'transparent';
+    ctx.moveTo(0,  -hs);    // top
+    ctx.lineTo(hs,   0);    // right
+    ctx.lineTo(0,    hs);   // bottom
+    ctx.lineTo(-hs,  0);    // left
+    ctx.closePath();
     ctx.fill();
-    ctx.shadowBlur  = 0;
+
+    // Top highlight face
+    ctx.fillStyle = shadeColor(uDef.color, 40);
+    ctx.beginPath();
+    ctx.moveTo(0,  -hs);
+    ctx.lineTo(hs,   0);
+    ctx.lineTo(0,    0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
 
     // HP bar
     const hpPct = Math.max(0, unit.hp / unit.maxHp);
-    const barW  = r * 2;
-    ctx.fillStyle = '#333';
-    ctx.fillRect(unit.x - r, unit.y - r - 5, barW, 3);
-    ctx.fillStyle = hpPct > 0.5 ? '#00e676' : hpPct > 0.25 ? '#ffab00' : '#ff1744';
-    ctx.fillRect(unit.x - r, unit.y - r - 5, barW * hpPct, 3);
+    const barW  = hs * 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(unit.x - hs, unit.y - hs - 5, barW, 3);
+    ctx.fillStyle = hpPct > 0.5 ? '#43a047' : hpPct > 0.25 ? '#fb8c00' : '#e53935';
+    ctx.fillRect(unit.x - hs, unit.y - hs - 5, barW * hpPct, 3);
   });
 
   // Victory / Defeat overlay
   if (bs.done) {
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillStyle = 'rgba(0, 40, 0, 0.65)';
     ctx.fillRect(0, 0, W, W);
-    ctx.font      = `bold 28px Orbitron, sans-serif`;
+    const txt   = bs.victory ? '⚔  VICTORY!' : '💀  DEFEAT';
+    const tColor = bs.victory ? '#ffd600' : '#ef5350';
+    ctx.font      = `bold 26px Nunito, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = bs.victory ? '#00e676' : '#ff1744';
-    ctx.shadowBlur  = 30;
-    ctx.shadowColor = bs.victory ? '#00e676' : '#ff1744';
-    ctx.fillText(bs.victory ? '⚔  VICTORY' : '💀  DEFEAT', W / 2, W / 2);
-    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(txt, W / 2 + 2, W / 2 + 2);
+    ctx.fillStyle = tColor;
+    ctx.fillText(txt, W / 2, W / 2);
   }
 }
 
