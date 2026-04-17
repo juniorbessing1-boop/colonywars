@@ -758,7 +758,7 @@ window.initiateAttack = async function () {
   try {
     const opponent = await getRandomOpponent(currentUser.uid);
     if (!opponent) {
-      notify('No opponents found yet. Be the first to build a base!', 'info');
+      notify('Nenhum outro jogador encontrado! Você é o único com uma base no momento.', 'error');
       attackBtn.disabled = false;
       return;
     }
@@ -766,7 +766,14 @@ window.initiateAttack = async function () {
     openBattleModal(opponent);
   } catch (err) {
     console.error('Attack error:', err);
-    notify('Failed to find an opponent. Try again.', 'error');
+    
+    // Mostrando exatamente qual foi o erro na tela para ajudar a debugar
+    if (err.message && err.message.includes('Missing or insufficient permissions')) {
+      notify('ERRO FIREBASE: Ajuste as suas Security Rules no console do Firebase Firestore!', 'error');
+    } else {
+      notify(`Erro ao atacar: ${err.message || 'Desconhecido'}`, 'error');
+    }
+    
     attackBtn.disabled = false;
   }
 };
