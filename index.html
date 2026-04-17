@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Colony Wars — Alien Planet Strategy</title>
+  <meta name="description" content="Build your colony, gather resources, and battle other commanders in this sci-fi browser strategy game." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════
+       AUTH SCREEN
+  ═══════════════════════════════════════════════ -->
+  <div id="auth-screen" class="screen active">
+    <div class="auth-bg">
+      <div class="stars" id="stars"></div>
+      <div class="nebula nebula-1"></div>
+      <div class="nebula nebula-2"></div>
+    </div>
+    <div class="auth-container">
+      <div class="auth-logo">
+        <div class="logo-hex">⬡</div>
+        <h1 class="logo-title">COLONY <span>WARS</span></h1>
+        <p class="logo-tagline">Survive · Build · Conquer</p>
+      </div>
+
+      <div class="auth-card glass">
+        <div class="auth-tabs">
+          <button class="tab-btn active" id="login-tab-btn" onclick="switchTab('login')">LOGIN</button>
+          <button class="tab-btn" id="register-tab-btn" onclick="switchTab('register')">REGISTER</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="login-form" class="auth-form active" autocomplete="on">
+          <div class="input-group">
+            <label for="login-email">COMMANDER EMAIL</label>
+            <input type="email" id="login-email" name="email" placeholder="commander@colony.space" required autocomplete="email" />
+          </div>
+          <div class="input-group">
+            <label for="login-password">ACCESS CODE</label>
+            <input type="password" id="login-password" name="password" placeholder="••••••••" required autocomplete="current-password" />
+          </div>
+          <div id="login-error" class="auth-error" role="alert"></div>
+          <button type="submit" class="btn-primary btn-full" id="login-btn">ENTER BASE</button>
+        </form>
+
+        <!-- Register Form -->
+        <form id="register-form" class="auth-form" autocomplete="on">
+          <div class="input-group">
+            <label for="reg-name">COMMANDER NAME</label>
+            <input type="text" id="reg-name" name="displayName" placeholder="Commander Zara" required autocomplete="name" />
+          </div>
+          <div class="input-group">
+            <label for="reg-email">COMMANDER EMAIL</label>
+            <input type="email" id="reg-email" name="email" placeholder="commander@colony.space" required autocomplete="email" />
+          </div>
+          <div class="input-group">
+            <label for="reg-password">ACCESS CODE</label>
+            <input type="password" id="reg-password" name="password" placeholder="Min. 6 characters" required autocomplete="new-password" />
+          </div>
+          <div id="register-error" class="auth-error" role="alert"></div>
+          <button type="submit" class="btn-primary btn-full" id="register-btn">ESTABLISH COLONY</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       GAME SCREEN
+  ═══════════════════════════════════════════════ -->
+  <div id="game-screen" class="screen">
+
+    <!-- Resource / Top Bar -->
+    <header class="resource-bar glass">
+      <div class="commander-badge">
+        <span class="cmdr-hex">⬡</span>
+        <span id="commander-name" class="cmdr-name">Commander</span>
+      </div>
+
+      <div class="resources-group">
+        <div class="resource-pill" id="res-minerals" title="Minerals">
+          <span class="res-icon mineral-icon">⛏</span>
+          <div class="res-values">
+            <span class="res-value" id="val-minerals">0</span>
+            <span class="res-cap" id="cap-minerals">/1000</span>
+          </div>
+          <span class="res-rate" id="rate-minerals">+0/s</span>
+        </div>
+        <div class="resource-pill" id="res-energy" title="Energy">
+          <span class="res-icon energy-icon">⚡</span>
+          <div class="res-values">
+            <span class="res-value" id="val-energy">0</span>
+            <span class="res-cap" id="cap-energy">/1000</span>
+          </div>
+          <span class="res-rate" id="rate-energy">+0/s</span>
+        </div>
+        <div class="resource-pill" id="res-oxygen" title="Oxygen">
+          <span class="res-icon oxygen-icon">◎</span>
+          <div class="res-values">
+            <span class="res-value" id="val-oxygen">0</span>
+            <span class="res-cap" id="cap-oxygen">/1000</span>
+          </div>
+          <span class="res-rate" id="rate-oxygen">+0/s</span>
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <button class="btn-attack" id="attack-btn" onclick="initiateAttack()">⚔ ATTACK</button>
+        <button class="btn-secondary" id="save-btn" onclick="manualSave()">💾 SAVE</button>
+        <button class="btn-logout" title="Logout" onclick="logoutPlayer()">⏻</button>
+      </div>
+    </header>
+
+    <!-- Main Game Layout -->
+    <div class="game-layout">
+
+      <!-- Left Sidebar: Build Panel -->
+      <aside class="panel build-panel glass" id="build-panel">
+        <div class="panel-header">
+          <h2 class="panel-title">STRUCTURES</h2>
+          <button class="btn-icon-cancel" id="cancel-build-btn" onclick="cancelBuild()" style="display:none" title="Cancel placement">✕</button>
+        </div>
+        <div class="build-list" id="build-list">
+          <!-- Populated by JS -->
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <div class="panel-section">
+          <h3 class="section-title">RECRUIT</h3>
+          <div class="unit-list" id="unit-list">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <div class="panel-section">
+          <h3 class="section-title">ARMY</h3>
+          <div class="army-display" id="army-display">
+            <p class="hint-text">No units trained.</p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: Grid Map -->
+      <main class="map-area">
+        <div class="grid-wrapper">
+          <canvas id="effect-canvas" class="effect-canvas"></canvas>
+          <div id="game-grid" class="game-grid"></div>
+        </div>
+        <div class="grid-footer">
+          <span class="save-status saved" id="save-status">✓ All changes saved</span>
+          <span class="grid-info">15×15 Colony Grid</span>
+        </div>
+      </main>
+
+      <!-- Right Sidebar: Intel Panel -->
+      <aside class="panel info-panel glass" id="info-panel">
+        <div class="panel-header">
+          <h2 class="panel-title">INTEL</h2>
+        </div>
+        <div id="selected-info">
+          <p class="hint-text">Click a building to inspect it. Click an empty cell while a structure is selected to place it.</p>
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <div class="panel-section">
+          <h3 class="section-title">DEFENSE LOG</h3>
+          <div class="defense-log" id="defense-log">
+            <p class="hint-text">No attacks recorded.</p>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       UPGRADE MODAL
+  ═══════════════════════════════════════════════ -->
+  <div id="upgrade-modal" class="modal-overlay" onclick="closeModal('upgrade-modal')">
+    <div class="modal glass" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 id="upgrade-title">UPGRADE STRUCTURE</h2>
+        <button class="btn-icon-cancel" onclick="closeModal('upgrade-modal')">✕</button>
+      </div>
+      <div class="modal-body" id="upgrade-body"></div>
+      <div class="modal-footer">
+        <button class="btn-primary" id="upgrade-confirm-btn">UPGRADE</button>
+        <button class="btn-danger" id="demolish-modal-btn">DEMOLISH</button>
+        <button class="btn-secondary" onclick="closeModal('upgrade-modal')">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       ATTACK / BATTLE MODAL
+  ═══════════════════════════════════════════════ -->
+  <div id="battle-modal" class="modal-overlay">
+    <div class="modal modal-wide glass">
+      <div class="modal-header">
+        <h2 id="battle-title">⚔ ATTACKING BASE</h2>
+      </div>
+      <div class="battle-layout">
+        <div class="battle-canvas-wrap">
+          <canvas id="attack-canvas"></canvas>
+        </div>
+        <div class="battle-sidebar">
+          <div class="deploy-section">
+            <h3 class="section-title">DEPLOY UNITS</h3>
+            <div id="deploy-units"></div>
+            <button class="btn-primary btn-full" id="start-battle-btn" onclick="startBattle()">▶ LAUNCH ATTACK</button>
+          </div>
+          <div class="panel-divider"></div>
+          <h3 class="section-title">BATTLE LOG</h3>
+          <div class="battle-log" id="battle-log"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-danger" id="retreat-btn" onclick="retreatFromBattle()">RETREAT</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       BATTLE RESULT MODAL
+  ═══════════════════════════════════════════════ -->
+  <div id="result-modal" class="modal-overlay">
+    <div class="modal glass">
+      <div class="modal-header">
+        <h2 id="result-title">BATTLE COMPLETE</h2>
+      </div>
+      <div class="modal-body" id="result-body"></div>
+      <div class="modal-footer">
+        <button class="btn-primary" onclick="closeBattleResult()">RETURN TO BASE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       LOADING OVERLAY
+  ═══════════════════════════════════════════════ -->
+  <div id="loading-overlay" class="loading-overlay active">
+    <div class="loading-content">
+      <div class="loading-hex">⬡</div>
+      <p class="loading-text">Establishing Connection...</p>
+    </div>
+  </div>
+
+  <!-- Notification toast (injected by JS) -->
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
