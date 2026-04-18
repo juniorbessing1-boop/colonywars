@@ -934,45 +934,37 @@ window.initiateAttack = async function () {
   try {
     const opponent = await getRandomOpponent(currentUser.uid);
     if (!opponent) {
-      notify('Nenhum outro jogador encontrado! Você é o único com uma base no momento.', 'error');
+      notify('No other players found!', 'error');
       attackBtn.disabled = false;
       return;
     }
     opponentData = opponent;
-    openBattleModal(opponent);
+    openBattleScreen(opponent);
   } catch (err) {
     console.error('Attack error:', err);
-    
-    // Mostrando exatamente qual foi o erro na tela para ajudar a debugar
-    if (err.message && err.message.includes('Missing or insufficient permissions')) {
-      notify('ERRO FIREBASE: Ajuste as suas Security Rules no console do Firebase Firestore!', 'error');
-    } else {
-      notify(`Erro ao atacar: ${err.message || 'Desconhecido'}`, 'error');
-    }
-    
+    notify(`Attack error: ${err.message || 'Unknown'}`, 'error');
     attackBtn.disabled = false;
   }
 };
 
-/** Open the attack canvas modal and show the enemy base. */
-function openBattleModal(opponent) {
+/** Switches to the fullscreen attack view. */
+function openBattleScreen(opponent) {
   const canvas = document.getElementById('attack-canvas');
-  const W      = GRID_SIZE * CELL_PX;
+  // Use a higher native resolution for crisp fullscreen rendering
+  const W = GRID_SIZE * CELL_PX * 2.5; 
   canvas.width  = W;
   canvas.height = W;
 
-  document.getElementById('battle-title').textContent =
-    `⚔ ATTACKING: ${opponent.data.displayName || 'Unknown Commander'}`;
+  document.querySelector('#battle-screen .cmdr-name').textContent = opponent.data.displayName || 'Unknown Commander';
 
   // Reset UI
-  document.getElementById('battle-log').innerHTML = '';
   document.getElementById('start-battle-btn').disabled = false;
-  document.getElementById('retreat-btn').textContent   = 'RETREAT';
+  document.getElementById('retreat-btn').innerHTML = '🏳️ RETREAT';
 
   // Draw the static enemy base
-  drawBaseOnCanvas(canvas.getContext('2d'), opponent.data.baseLayout || {}, CELL_PX);
+  drawBaseOnCanvas(canvas.getContext('2d'), opponent.data.baseLayout || {}, CELL_PX * 2.5);
 
-  // Build deploy section
+  // Build deploy section cards
   deployedCounts = {};
   Object.keys(gameState.units).forEach(id => { deployedCounts[id] = 0; });
 
@@ -981,20 +973,32 @@ function openBattleModal(opponent) {
     .filter(([, n]) => n > 0)
     .map(([id, total]) => {
       const u = UNITS[id];
+      let unitImgName = 'scout_dron';
+      if (id === 'robot') unitImgName = 'combat_robot';
+      if (id === 'ranger') unitImgName = 'plasma_ranger';
+      const imgSrc = getCachedImg(unitImgName, true).src;
+
       return `
-        <div class="deploy-unit-row">
-          <span style="color:${u.color}">${u.emoji} ${u.name}</span>
+        <div class="deploy-card" onclick="selectAllDeploy('${id}', ${total})">
+          <img src="${imgSrc}">
+          <div class="deploy-name">${u.name}</div>
           <div class="deploy-controls">
-            <button onclick="adjustDeploy('${id}',-1)">−</button>
-            <span id="deploy-count-${id}">0</span>
-            <button onclick="adjustDeploy('${id}',1)">+</button>
+            <button onclick="event.stopPropagation(); adjustDeploy('${id}',-1)">−</button>
+            <span id="deploy-count-${id}">${deployedCounts[id]}</span>
+            <button onclick="event.stopPropagation(); adjustDeploy('${id}',1)">+</button>
           </div>
-          <span class="deploy-max">/${total}</span>
+          <div class="deploy-max">Max: ${total}</div>
         </div>`;
     }).join('');
 
-  openModal('battle-modal');
+  // Switch active screens natively
+  document.getElementById('game-screen').classList.remove('active');
+  document.getElementById('battle-screen').classList.add('active');
 }
+
+window.selectAllDeploy = function(id, total) {
+  adjustDeploy(id, total - deployedCounts[id]);
+};
 
 window.adjustDeploy = function (unitId, delta) {
   const max    = gameState.units[unitId] || 0;
@@ -1283,12 +1287,15 @@ async function finishBattle() {
     buildUnitMenu();
     scheduleAutoSave();
 
-    closeModal('battle-modal');
+    closeModal('result-modal'); // If result logic uses closeModal
+    document.getElementById('battle-screen').classList.remove('active');
+    document.getElementById('game-screen').classList.add('active');
     showBattleResult(battleState.victory, loot, battleState.log);
   } catch (err) {
     console.error('Battle save error:', err);
     notify('Battle over! (Could not save results)', 'error');
-    closeModal('battle-modal');
+    document.getElementById('battle-screen').classList.remove('active');
+    document.getElementById('game-screen').classList.add('active');
   }
 
   document.getElementById('attack-btn').disabled = false;
@@ -1318,12 +1325,11 @@ function showBattleResult(victory, loot, log) {
 window.closeBattleResult = function () { closeModal('result-modal'); };
 
 window.retreatFromBattle = function () {
-  if (battleState) battleState.done = true;
-  closeModal('battle-modal');
-  document.getElementById('attack-btn').disabled = false;
-  document.getElementById('start-battle-btn').disabled = false;
-  battleState  = null;
+  battleState = null;
   opponentData = null;
+  document.getElementById('battle-screen').classList.remove('active');
+  document.getElementById('game-screen').classList.add('active');
+  document.getElementById('attack-btn').disabled = false;
 };
 
 

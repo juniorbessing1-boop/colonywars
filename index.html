@@ -114,37 +114,8 @@
 
     <!-- Main Game Layout -->
     <div class="game-layout">
-
-      <!-- Left Sidebar: Build Panel -->
-      <aside class="panel build-panel" id="build-panel">
-        <div class="panel-header">
-          <h2 class="panel-title">🏗 Structures</h2>
-          <button class="btn-icon-cancel" id="cancel-build-btn" onclick="cancelBuild()" style="display:none" title="Cancel placement">✕</button>
-        </div>
-        <div class="build-list" id="build-list">
-          <!-- Populated by JS -->
-        </div>
-
-        <div class="panel-divider"></div>
-
-        <div class="panel-section">
-          <h3 class="section-title">⚔ Recruit</h3>
-          <div class="unit-list" id="unit-list">
-            <!-- Populated by JS -->
-          </div>
-        </div>
-
-        <div class="panel-divider"></div>
-
-        <div class="panel-section">
-          <h3 class="section-title">🪖 Army</h3>
-          <div class="army-display" id="army-display">
-            <p class="hint-text">No units trained.</p>
-          </div>
-        </div>
-      </aside>
-
-      <!-- Center: Grid Map -->
+      
+      <!-- Fullscreen Grid Map -->
       <main class="map-area">
         <div class="map-controls">
            <button id="zoom-in-btn" class="zoom-btn" onclick="zoomMap(1)" title="Zoom In">+</button>
@@ -154,31 +125,70 @@
           <canvas id="effect-canvas" class="effect-canvas"></canvas>
           <div id="game-grid" class="game-grid"></div>
         </div>
-        <div class="grid-footer">
-          <span class="save-status saved" id="save-status">✓ All changes saved</span>
-          <span class="grid-info">15×15 Colony Grid</span>
-        </div>
       </main>
 
-      <!-- Right Sidebar: Intel Panel -->
-      <aside class="panel info-panel" id="info-panel">
+      <!-- Floating HUD: Left Side (Army / Build / Intel) -->
+      <aside class="panel build-panel" id="build-panel">
         <div class="panel-header">
-          <h2 class="panel-title">🔍 Intel</h2>
+          <h2 class="panel-title">🏗 Base Console</h2>
+          <button class="btn-icon-cancel" id="cancel-build-btn" onclick="cancelBuild()" style="display:none" title="Cancel placement">✕</button>
         </div>
-        <div id="selected-info">
-          <p class="hint-text">Click a building to inspect it. Click an empty cell while a structure is selected to place it.</p>
-        </div>
-
+        <div class="build-list" id="build-list"></div>
         <div class="panel-divider"></div>
+        <div class="panel-section">
+          <h3 class="section-title">⚔ Recruit Troops</h3>
+          <div class="unit-list" id="unit-list"></div>
+        </div>
+        <div class="panel-divider"></div>
+        <div class="panel-section">
+          <h3 class="section-title">🪖 Your Army</h3>
+          <div class="army-display" id="army-display"><p class="hint-text">No units trained.</p></div>
+        </div>
+      </aside>
 
+      <!-- Floating HUD: Right Side (Intel overlay) -->
+      <aside class="panel info-panel" id="info-panel">
+        <div class="panel-header"><h2 class="panel-title">🔍 Intel</h2></div>
+        <div id="selected-info"><p class="hint-text">Select a building.</p></div>
+        <div class="panel-divider"></div>
         <div class="panel-section">
           <h3 class="section-title">📋 Defense Log</h3>
-          <div class="defense-log" id="defense-log">
-            <p class="hint-text">No attacks recorded.</p>
-          </div>
+          <div class="defense-log" id="defense-log"><p class="hint-text">No attacks.</p></div>
         </div>
       </aside>
     </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       BATTLE SCREEN (FULLSCREEN ATTACK VIEW)
+  ═══════════════════════════════════════════════ -->
+  <div id="battle-screen" class="screen">
+    
+    <!-- Top HUD for Battle -->
+    <header class="resource-bar glass" style="justify-content: space-between;">
+      <div class="commander-badge" style="background: rgba(229, 57, 53, 0.2); border-color: #e53935;">
+        <div class="cmdr-hex" style="background: linear-gradient(135deg, #e53935, #b71c1c);">⚔</div>
+        <span class="cmdr-name">ENEMY BASE</span>
+      </div>
+      <button class="btn-danger" id="retreat-btn" onclick="retreatFromBattle()">🏳️ RETREAT</button>
+    </header>
+
+    <main class="map-area">
+      <!-- Fullscreen Battle Canvas Wrapper -->
+      <div class="grid-wrapper" id="battle-grid-wrapper" style="margin-top: 0;">
+        <canvas id="attack-canvas" style="position: absolute; inset: -400px; width: calc(100% + 800px); height: calc(100% + 800px);"></canvas>
+      </div>
+    </main>
+
+    <!-- Bottom HUD (Deploying Units) -->
+    <footer class="battle-hud-bottom glass">
+      <div class="deploy-carousel" id="deploy-units">
+        <!-- JS populates deploy unit cards here -->
+      </div>
+      <div class="battle-controls">
+        <button class="btn-primary btn-full" id="start-battle-btn" onclick="startBattle()" style="width: 250px; font-size: 16px;">▶ LAUNCH ATTACK</button>
+      </div>
+    </footer>
   </div>
 
   <!-- ═══════════════════════════════════════════════
@@ -200,35 +210,6 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════
-       ATTACK / BATTLE MODAL
-  ═══════════════════════════════════════════════ -->
-  <div id="battle-modal" class="modal-overlay">
-    <div class="modal modal-wide glass">
-      <div class="modal-header">
-        <h2 id="battle-title">⚔ ATTACKING BASE</h2>
-      </div>
-      <div class="battle-layout">
-        <div class="battle-canvas-wrap">
-          <canvas id="attack-canvas"></canvas>
-        </div>
-        <div class="battle-sidebar">
-          <div class="deploy-section">
-            <h3 class="section-title">DEPLOY UNITS</h3>
-            <div id="deploy-units"></div>
-            <button class="btn-primary btn-full" id="start-battle-btn" onclick="startBattle()">▶ LAUNCH ATTACK</button>
-          </div>
-          <div class="panel-divider"></div>
-          <h3 class="section-title">BATTLE LOG</h3>
-          <div class="battle-log" id="battle-log"></div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-danger" id="retreat-btn" onclick="retreatFromBattle()">RETREAT</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════
        BATTLE RESULT MODAL
   ═══════════════════════════════════════════════ -->
   <div id="result-modal" class="modal-overlay">
@@ -243,15 +224,10 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════
-       LOADING OVERLAY
-  ═══════════════════════════════════════════════ -->
   <div id="loading-overlay" class="loading-overlay active">
     <div class="loading-hex"></div>
     <p class="loading-text">Establishing Colony...</p>
   </div>
-
-  <!-- Notification toast (injected by JS) -->
 
   <script type="module" src="main.js"></script>
 </body>

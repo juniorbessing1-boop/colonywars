@@ -101,7 +101,14 @@ html, body {
 /* ════════════════════════════════════════════════════════════
    SCREENS
    ════════════════════════════════════════════════════════════ */
-.screen { display: none; width: 100vw; height: 100vh; }
+.screen {
+  display: none;
+  width: 100vw;
+  height: 100vh;
+  position: absolute;
+  top: 0; left: 0;
+  overflow: hidden;
+}
 .screen.active { display: flex; flex-direction: column; }
 
 
@@ -1933,3 +1940,54 @@ html, body {
   .cmdr-name { display: none; }
   .grid-wrapper { transform: rotateX(18deg); }
 }
+
+/* ------------------------------------------------------------
+   FULLSCREEN BATTLE HUD
+   ------------------------------------------------------------ */
+.battle-hud-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0; right: 0;
+  height: auto;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  background: rgba(10, 14, 23, 0.85);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border-light);
+  padding: 20px;
+  z-index: 100;
+}
+
+.deploy-carousel {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 5px;
+}
+
+
+/* Battle Deploy Cards */
+.deploy-card {
+  background: var(--bg-1);
+  border: 2px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 90px;
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+.deploy-card:hover { border-color: var(--primary); }
+.deploy-card img { height: 45px; object-fit: contain; margin-bottom: 5px; }
+.deploy-name { font-size: 11px; font-weight: bold; color: var(--text-primary); text-transform: uppercase; }
+.deploy-controls { display: flex; gap: 8px; align-items: center; margin-top: 5px; }
+.deploy-controls button { width: 24px; height: 24px; border-radius: 4px; background: var(--bg-2); color: white; border: none; cursor: pointer; }
+.deploy-max { font-size: 10px; color: var(--text-muted); margin-top: 5px; }
+
