@@ -1051,107 +1051,76 @@ const LP_TILE_A = '#7cb87c';
 const LP_TILE_B = '#8dcf8d';
 const LP_TILE_C = '#6aa56a';
 
+const CANVAS_IMG_CACHE = {};
+function getCachedImg(name, isUnit = false) {
+  const path = isUnit ? `assets/${name}.png` : name;
+  if (!CANVAS_IMG_CACHE[path]) {
+    const img = new Image();
+    img.src = path;
+    CANVAS_IMG_CACHE[path] = img;
+  }
+  return CANVAS_IMG_CACHE[path];
+}
+
 /** Draw a low poly terrain grid background on canvas. */
 function drawLPTerrain(ctx, W, cellSize) {
   for (let row = 0; row < GRID_SIZE; row++) {
     for (let col = 0; col < GRID_SIZE; col++) {
-      const x = col * cellSize, y = row * cellSize;
       const idx = row * GRID_SIZE + col;
-      ctx.fillStyle = (idx % 3 === 0) ? LP_TILE_C : (idx % 2 === 0) ? LP_TILE_A : LP_TILE_B;
-      ctx.fillRect(x, y, cellSize, cellSize);
-      // Tile border
-      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(x + 0.25, y + 0.25, cellSize - 0.5, cellSize - 0.5);
+      ctx.fillStyle = (idx % 2 === 0) ? LP_TILE_A : LP_TILE_B;
+      ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+      ctx.strokeStyle = 'rgba(90,158,90,0.3)';
+      ctx.strokeRect(col * cellSize, row * cellSize, cellSize, cellSize);
     }
   }
 }
 
-/**
- * Draw a single low poly building block on canvas.
- * Uses a 3-tone approach: front face, right side face (shadow), top face.
- */
-function drawLPBuilding(ctx, x, y, cellSize, color, alive) {
-  const pad  = Math.floor(cellSize * 0.12);
-  const bx   = x + pad,     by   = y + pad;
-  const bw   = cellSize - pad * 2 - Math.floor(cellSize * 0.18);
-  const bh   = cellSize - pad * 2;
-  const side = Math.floor(cellSize * 0.18); // right-face width
-  const top  = Math.floor(cellSize * 0.20); // top-face height
+function drawIsometricSprite(ctx, src, x, y, width, height, isRubble = false) {
+  const img = getCachedImg(src);
+  if (!img.complete || img.naturalWidth === 0) return;
 
-  if (!alive) {
-    // Rubble — scattered grey polygons
-    ctx.fillStyle = 'rgba(100,100,100,0.6)';
-    ctx.fillRect(bx + 2, by + bh * 0.5, bw * 0.5, bh * 0.45);
-    ctx.fillStyle = 'rgba(80,80,80,0.5)';
-    ctx.fillRect(bx + bw * 0.4, by + bh * 0.6, bw * 0.5, bh * 0.35);
-    ctx.fillStyle = 'rgba(60,60,60,0.4)';
-    ctx.fillRect(bx + bw * 0.2, by + bh * 0.72, bw * 0.3, bh * 0.2);
-    return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(-45 * Math.PI / 180);
+  ctx.scale(1, 2); 
+  if (isRubble) ctx.globalAlpha = 0.35;
+  ctx.drawImage(img, -width / 2, -height + 10, width, height);
+  ctx.restore();
+}
+
+function drawSpriteUI(ctx, cx, cy, level, hpPct, w) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-45 * Math.PI / 180);
+  ctx.scale(1, 2);
+  
+  if (level !== '') {
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(`L${level}`, 0, -30);
   }
-
-  // ── Front face ──
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.rect(bx, by + top, bw, bh - top);
-  ctx.fill();
-
-  // ── Right / shadow face ──
-  ctx.fillStyle = shadeColor(color, -38);
-  ctx.beginPath();
-  ctx.moveTo(bx + bw,       by + top);
-  ctx.lineTo(bx + bw + side, by + top + side * 0.5);
-  ctx.lineTo(bx + bw + side, by + bh + side * 0.5);
-  ctx.lineTo(bx + bw,        by + bh);
-  ctx.closePath();
-  ctx.fill();
-
-  // ── Top face ──
-  ctx.fillStyle = shadeColor(color, 30);
-  ctx.beginPath();
-  ctx.moveTo(bx,             by + top);
-  ctx.lineTo(bx + side,      by);
-  ctx.lineTo(bx + bw + side, by);
-  ctx.lineTo(bx + bw,        by + top);
-  ctx.closePath();
-  ctx.fill();
-
-  // Subtle top edge highlight
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-  ctx.lineWidth = 0.8;
-  ctx.beginPath();
-  ctx.moveTo(bx, by + top); ctx.lineTo(bx + side, by); ctx.lineTo(bx + bw + side, by);
-  ctx.stroke();
+  
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(-w/2, -15, w, 4);
+  ctx.fillStyle = hpPct > 0.5 ? '#43a047' : '#e53935';
+  ctx.fillRect(-w/2, -15, w * hpPct, 4);
+  
+  ctx.restore();
 }
-
-/** Lighten (+) or darken (-) a CSS hex colour by amount. */
-function shadeColor(hex, amount) {
-  const num = parseInt(hex.replace('#',''), 16);
-  const r   = Math.min(255, Math.max(0, (num >> 16) + amount));
-  const g   = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amount));
-  const b   = Math.min(255, Math.max(0, (num & 0xff) + amount));
-  return `rgb(${r},${g},${b})`;
-}
-
-/** Map of building id → flat canvas colour (friendlier than bDef.color for LP) */
-const LP_COLORS = {
-  cc:       '#ffd600',
-  mine:     '#ff8f00',
-  solar:    '#fdd835',
-  oxy:      '#66bb6a',
-  depot:    '#42a5f5',
-  turret:   '#ef5350',
-  barracks: '#ab47bc',
-};
 
 /** Draw a static base grid (enemy base or initial view). */
 function drawBaseOnCanvas(ctx, layout, cellSize) {
   const W = GRID_SIZE * cellSize;
+  
+  ctx.save();
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  
+  // Apply true Isometric Transformation to context
+  ctx.translate(ctx.canvas.width / 2, 40);
+  ctx.scale(1, 0.5);
+  ctx.rotate(45 * Math.PI / 180);
 
-  // Low poly terrain
   drawLPTerrain(ctx, W, cellSize);
-
-  // Outer border
   ctx.strokeStyle = '#5a9e5a';
   ctx.lineWidth = 2;
   ctx.strokeRect(0, 0, W, W);
@@ -1163,18 +1132,21 @@ function drawBaseOnCanvas(ctx, layout, cellSize) {
     const bDef = BUILDINGS[cell.buildingId];
     if (!bDef) return;
 
-    const x = col * cellSize, y = row * cellSize;
-    const color = LP_COLORS[cell.buildingId] || bDef.color;
+    const size = getBuildingSize(cell.buildingId);
+    const src  = buildingImgSrc(cell.buildingId, cell.level);
+    
+    // Center point of the building
+    const cx = (col + size / 2) * cellSize;
+    const cy = (row + size / 2) * cellSize;
+    const renderSize = size * cellSize * 1.5;
 
-    drawLPBuilding(ctx, x, y, cellSize, color, true);
+    drawIsometricSprite(ctx, src, cx, cy, renderSize, renderSize);
 
-    // Level badge
-    ctx.font        = `bold ${Math.floor(cellSize * 0.20)}px Nunito,Inter,sans-serif`;
-    ctx.fillStyle   = '#fff';
-    ctx.textAlign   = 'left';
-    ctx.textBaseline= 'top';
-    ctx.fillText(`L${cell.level}`, x + 2, y + 2);
+    const hpPct = Math.max(0, cell.hp / (cell.maxHp || bDef.hp[cell.level - 1]));
+    drawSpriteUI(ctx, cx, cy, cell.level, hpPct, 30);
   });
+  
+  ctx.restore();
 }
 
 /** Animated low poly battle frame renderer. */
@@ -1182,134 +1154,92 @@ function renderBattleFrame(ctx, bs, layout) {
   const cellSize = CELL_PX;
   const W        = GRID_SIZE * cellSize;
 
-  // Low poly terrain background
-  drawLPTerrain(ctx, W, cellSize);
+  ctx.save();
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  
+  // Apply true Isometric Transformation to context
+  ctx.translate(ctx.canvas.width / 2, 40);
+  ctx.scale(1, 0.5);
+  ctx.rotate(45 * Math.PI / 180);
 
-  // Outer border
+  drawLPTerrain(ctx, W, cellSize);
   ctx.strokeStyle = '#5a9e5a';
   ctx.lineWidth = 2;
   ctx.strokeRect(0, 0, W, W);
 
   // Buildings
   bs.buildings.forEach(b => {
-    const x = b.col * cellSize;
-    const y = b.row * cellSize;
-    const color = LP_COLORS[b.buildingId] || '#888';
-
-    drawLPBuilding(ctx, x, y, cellSize, color, b.alive);
+    const size = getBuildingSize(b.buildingId);
+    const src  = buildingImgSrc(b.buildingId, b.level);
+    const cx = (b.col + size / 2) * cellSize;
+    const cy = (b.row + size / 2) * cellSize;
+    const renderSize = size * cellSize * 1.5;
 
     if (b.alive) {
-      // HP bar
+      drawIsometricSprite(ctx, src, cx, cy, renderSize, renderSize);
       const hpPct = Math.max(0, b.hp / b.maxHp);
-      const barW  = cellSize - 6;
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      ctx.fillRect(x + 3, y + cellSize - 5, barW, 4);
-      ctx.fillStyle = hpPct > 0.5 ? '#43a047' : hpPct > 0.25 ? '#fb8c00' : '#e53935';
-      ctx.fillRect(x + 3, y + cellSize - 5, barW * hpPct, 4);
-
-      // Level badge
-      ctx.font        = `bold ${Math.floor(cellSize * 0.2)}px Nunito,Inter,sans-serif`;
-      ctx.fillStyle   = '#fff';
-      ctx.textAlign   = 'left';
-      ctx.textBaseline= 'top';
-      ctx.fillText(`L${b.level}`, x + 2, y + 2);
-
-      // Turret range ring
+      drawSpriteUI(ctx, cx, cy, b.level, hpPct, 40);
+      
       if (b.buildingId === 'turret') {
-        const range = BUILDINGS.turret.range[b.level - 1] * cellSize;
+        const MathRange = BUILDINGS.turret.range[b.level - 1] * cellSize;
         ctx.beginPath();
-        ctx.arc(b.x, b.y, range, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(239,83,80,0.22)';
-        ctx.lineWidth   = 1.5;
+        ctx.arc(cx, cy, MathRange, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(239,83,80,0.4)';
+        ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
         ctx.stroke();
         ctx.setLineDash([]);
       }
+    } else {
+       drawIsometricSprite(ctx, src, cx, cy, renderSize, renderSize, true);
     }
   });
 
-  // Projectiles — low poly bolts (small triangles)
+  // Projectiles
   bs.projectiles.forEach(p => {
     const t  = 1 - p.life;
     const px = p.x + (p.tx - p.x) * t;
     const py = p.y + (p.ty - p.y) * t;
-    const angle = Math.atan2(p.ty - p.y, p.tx - p.x);
-    const len   = 8;
-
     ctx.save();
     ctx.translate(px, py);
-    ctx.rotate(angle);
-    ctx.globalAlpha = Math.max(0, p.life);
-    ctx.fillStyle   = p.color;
+    ctx.rotate(-45 * Math.PI / 180);
+    ctx.scale(1, 2);
+    ctx.fillStyle = p.color;
     ctx.beginPath();
-    ctx.moveTo(len, 0);
-    ctx.lineTo(-len * 0.5,  3);
-    ctx.lineTo(-len * 0.5, -3);
-    ctx.closePath();
+    ctx.arc(0, -10, 3, 0, Math.PI*2);
     ctx.fill();
-    ctx.globalAlpha = 1;
     ctx.restore();
   });
 
-  // Units — low poly capsule / rhombus shape
+  // Units
   bs.units.forEach(unit => {
     if (!unit.alive) return;
-    const uDef = UNITS[unit.unitType];
-    const hs = 7;  // half-size
+    
+    let unitImgName = 'scout_dron';
+    if (unit.unitType === 'robot') unitImgName = 'combat_robot';
+    if (unit.unitType === 'ranger') unitImgName = 'plasma_ranger';
+    
+    const uSrc = getCachedImg(unitImgName, true).src;
+    drawIsometricSprite(ctx, uSrc, unit.x, unit.y, 40, 40);
 
-    // Ground shadow
-    ctx.save();
-    ctx.translate(unit.x + 2, unit.y + 3);
-    ctx.scale(1, 0.5);
-    ctx.beginPath();
-    ctx.arc(0, 0, hs, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.fill();
-    ctx.restore();
-
-    // Body — diamond shape (low poly)
-    ctx.save();
-    ctx.translate(unit.x, unit.y);
-    ctx.fillStyle = uDef.color;
-    ctx.beginPath();
-    ctx.moveTo(0,  -hs);    // top
-    ctx.lineTo(hs,   0);    // right
-    ctx.lineTo(0,    hs);   // bottom
-    ctx.lineTo(-hs,  0);    // left
-    ctx.closePath();
-    ctx.fill();
-
-    // Top highlight face
-    ctx.fillStyle = shadeColor(uDef.color, 40);
-    ctx.beginPath();
-    ctx.moveTo(0,  -hs);
-    ctx.lineTo(hs,   0);
-    ctx.lineTo(0,    0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    // HP bar
     const hpPct = Math.max(0, unit.hp / unit.maxHp);
-    const barW  = hs * 2;
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.fillRect(unit.x - hs, unit.y - hs - 5, barW, 3);
-    ctx.fillStyle = hpPct > 0.5 ? '#43a047' : hpPct > 0.25 ? '#fb8c00' : '#e53935';
-    ctx.fillRect(unit.x - hs, unit.y - hs - 5, barW * hpPct, 3);
+    drawSpriteUI(ctx, unit.x, unit.y, '', hpPct, 20);
   });
 
-  // Victory / Defeat overlay
+  ctx.restore(); // Exit isometric transform
+
+  // Victory / Defeat overlay (Flat overlay)
   if (bs.done) {
     ctx.fillStyle = 'rgba(0, 40, 0, 0.65)';
-    ctx.fillRect(0, 0, W, W);
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     const txt   = bs.victory ? '⚔  VICTORY!' : '💀  DEFEAT';
     const tColor = bs.victory ? '#ffd600' : '#ef5350';
     ctx.font      = `bold 26px Nunito, sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = '#fff';
-    ctx.fillText(txt, W / 2 + 2, W / 2 + 2);
+    ctx.fillText(txt, ctx.canvas.width / 2 + 2, ctx.canvas.height / 2 + 2);
     ctx.fillStyle = tColor;
-    ctx.fillText(txt, W / 2, W / 2);
+    ctx.fillText(txt, ctx.canvas.width / 2, ctx.canvas.height / 2);
   }
 }
 

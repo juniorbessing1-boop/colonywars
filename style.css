@@ -834,11 +834,11 @@ html, body {
 .grid-wrapper {
   position: relative;
   flex-shrink: 0;
-  /* 2.5D isometric tilt */
-  transform: rotateX(28deg) rotateZ(0deg);
+  /* Diamond Isometric tilt */
+  transform: rotateX(60deg) rotateZ(-45deg) scale(1.15);
   transform-style: preserve-3d;
-  /* Counter-scale to compensate vertical squish */
-  transform-origin: center 60%;
+  transform-origin: center center;
+  margin-top: 50px;
 }
 
 .effect-canvas {
@@ -1031,6 +1031,7 @@ html, body {
     transform var(--trans-med),
     box-shadow var(--trans-med);
   overflow: visible;
+  transform-style: preserve-3d;
 }
 
 .building-overlay:hover {
@@ -1086,6 +1087,9 @@ html, body {
   align-items: center;
   justify-content: center;
   padding: 4px;
+  /* Counter-rotate to stand upright */
+  transform: rotateZ(45deg) rotateX(-60deg) scale(1.6);
+  transform-origin: center bottom;
 }
 
 .bld-img {
@@ -1111,19 +1115,20 @@ html, body {
 /* HP bar on overlay */
 .building-overlay .building-hp-bar {
   position: absolute;
-  bottom: 2px;
+  bottom: -15px;
   left: 6px; right: 6px;
   height: 5px;
   background: rgba(0,0,0,0.3);
   border-radius: 3px;
   z-index: 15;
+  transform: rotateZ(45deg) rotateX(-60deg);
 }
 
 /* Level badge on overlay */
 .building-overlay .building-level {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: -15px;
+  right: -5px;
   font-family: var(--font-head);
   font-size: 10px;
   font-weight: 900;
@@ -1135,6 +1140,7 @@ html, body {
   z-index: 20;
   line-height: 16px;
   border: 1px solid rgba(255,255,255,0.2);
+  transform: rotateZ(45deg) rotateX(-60deg);
 }
 
 /* ── HP fill colours (reused) ── */
