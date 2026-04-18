@@ -1089,8 +1089,9 @@ function drawIsometricSprite(ctx, src, x, y, width, height, isRubble = false) {
   const ratio = img.naturalHeight / img.naturalWidth;
   const drawH = width * ratio;
   
-  // height/2 parameter here offsets the bottom center
-  ctx.drawImage(img, -width / 2, -drawH + (width * 0.25), width, drawH);
+  // For a 1x1 isometric tile, the visual center of its floor base natively sits 
+  // exactly half-width (width * 0.5) units above the bottom bounding edge.
+  ctx.drawImage(img, -width / 2, -drawH + (width * 0.5), width, drawH);
   ctx.restore();
 }
 
