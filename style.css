@@ -905,7 +905,7 @@ html, body {
   inset: 0;
   border: 3px solid #ffd600;
   box-shadow: inset 0 0 8px rgba(255,214,0,0.5), 0 0 12px rgba(255,214,0,0.4);
-  z-index: 10;
+  z-index: 14;
   pointer-events: none;
   animation: selectedPulse 1.4s ease-in-out infinite alternate;
 }
@@ -943,19 +943,269 @@ html, body {
 }
 
 /* Fog of war */
-.grid-cell.fog { background: rgba(50,50,50,0.55) !important; }
+.grid-cell.fog { background: rgba(30,40,30,0.65) !important; }
 .grid-cell.fog::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(20,30,20,0.6);
+  background: rgba(10,20,10,0.55);
   z-index: 2;
+}
+
+/* Ghost cells (footprint of a multi-cell building — keep visually clean) */
+.grid-cell.ghost-cell {
+  border-color: rgba(90,158,90,0.12);
+}
+
+/* Place preview — valid */
+.grid-cell.place-preview {
+  background: rgba(165,214,167,0.9) !important;
+  cursor: crosshair;
+}
+.grid-cell.place-preview::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(67,160,71,0.18);
+  border: 2px dashed rgba(46,125,50,0.6);
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* Place preview — invalid (occupied) */
+.grid-cell.place-preview-bad {
+  background: rgba(239,83,80,0.25) !important;
+  cursor: not-allowed;
+}
+.grid-cell.place-preview-bad::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(229,57,53,0.15);
+  border: 2px dashed rgba(229,57,53,0.6);
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* Move preview — valid destination */
+.grid-cell.move-preview-ok {
+  background: rgba(3,169,244,0.25) !important;
+  cursor: crosshair;
+}
+.grid-cell.move-preview-ok::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px dashed rgba(3,169,244,0.7);
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* Move preview — invalid destination */
+.grid-cell.move-preview-bad {
+  background: rgba(239,83,80,0.25) !important;
+  cursor: not-allowed;
+}
+
+/* Move mode: cursor on grid */
+.game-grid.move-mode .grid-cell:not(.ghost-cell) {
+  cursor: crosshair;
 }
 
 
 /* ════════════════════════════════════════════════════════════
-   LOW POLY BUILDINGS  (CSS 3D illusion)
+   BUILDING OVERLAYS  (multi-cell PNG images)
    ════════════════════════════════════════════════════════════ */
+
+/* Overlays are positioned inside the grid using grid-column/row span */
+.building-overlay {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 6px;
+  transition:
+    filter var(--trans-med),
+    transform var(--trans-med),
+    box-shadow var(--trans-med);
+  overflow: visible;
+}
+
+.building-overlay:hover {
+  filter: brightness(1.1) drop-shadow(0 4px 12px rgba(0,0,0,0.35));
+  transform: translateY(-4px) scale(1.02);
+  z-index: 10 !important;
+}
+
+.building-overlay.selected {
+  filter: brightness(1.15) drop-shadow(0 0 14px rgba(255,214,0,0.75));
+  z-index: 12 !important;
+}
+
+.building-overlay.moving {
+  filter: brightness(0.75) drop-shadow(0 0 12px rgba(3,169,244,0.8));
+  animation: movePulse 1s ease-in-out infinite alternate;
+  z-index: 12 !important;
+}
+@keyframes movePulse {
+  from { filter: brightness(0.75) drop-shadow(0 0 10px rgba(3,169,244,0.6)); }
+  to   { filter: brightness(0.9) drop-shadow(0 0 20px rgba(3,169,244,1)); }
+}
+
+/* Construction build-in animation */
+@keyframes buildIn {
+  0%   { transform: scale(0.5) translateY(20px); opacity: 0; }
+  65%  { transform: scale(1.06) translateY(-4px); opacity: 1; }
+  85%  { transform: scale(0.97) translateY(2px); }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+.building-overlay.building-construct {
+  animation: buildIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* CC glow */
+.building-cc-anim {
+  animation: ccGlowOverlay 2.5s ease-in-out infinite alternate;
+}
+@keyframes ccGlowOverlay {
+  from { filter: drop-shadow(0 4px 10px rgba(255,193,7,0.35)); }
+  to   { filter: drop-shadow(0 6px 20px rgba(255,193,7,0.75)); }
+}
+.building-cc-anim:hover {
+  animation: none;
+  filter: brightness(1.12) drop-shadow(0 4px 16px rgba(255,193,7,0.8));
+}
+
+/* Image container fills the overlay */
+.bld-img-wrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.bld-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Fallback emoji if PNG not found */
+.bld-fallback {
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* HP bar on overlay */
+.building-overlay .building-hp-bar {
+  position: absolute;
+  bottom: 2px;
+  left: 6px; right: 6px;
+  height: 5px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 3px;
+  z-index: 15;
+}
+
+/* Level badge on overlay */
+.building-overlay .building-level {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-family: var(--font-head);
+  font-size: 10px;
+  font-weight: 900;
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  border-radius: 6px;
+  padding: 1px 5px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  z-index: 20;
+  line-height: 16px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* ── HP fill colours (reused) ── */
+.hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #66bb6a, #43a047);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+.hp-fill.hp-mid { background: linear-gradient(90deg, #ffa726, #fb8c00); }
+.hp-fill.hp-low { background: linear-gradient(90deg, #ef5350, #e53935); }
+
+
+/* ════════════════════════════════════════════════════════════
+   BUILDING INFO PANEL — image preview
+   ════════════════════════════════════════════════════════════ */
+
+.info-bld-img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.06);
+  padding: 4px;
+}
+
+/* Move button */
+.btn-move {
+  width: 100%;
+  background: #fff;
+  color: var(--blue);
+  border: 2px solid var(--blue-light);
+  border-radius: var(--radius-sm);
+  padding: 7px;
+  font-family: var(--font-head);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--trans-fast);
+  letter-spacing: 0.05em;
+}
+.btn-move:hover { background: var(--blue-light); border-color: var(--blue); }
+.btn-move.active {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(30,136,229,0.25);
+}
+
+/* Build thumb in sidebar menu (PNG) */
+.build-thumb {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+.build-thumb-img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+
 
 .cell-building {
   position: absolute;

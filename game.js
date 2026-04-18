@@ -20,6 +20,32 @@ export const GRID_SIZE = 15;          // Grid is GRID_SIZE × GRID_SIZE cells
 export const GRID_CELLS = GRID_SIZE * GRID_SIZE;
 export const CELL_PX = 36;           // Pixels per cell on the attack canvas
 
+/** Returns the grid footprint size for a building (CC = 4, others = 3). */
+export function getBuildingSize(buildingId) {
+  return buildingId === 'cc' ? 4 : 3;
+}
+
+/**
+ * Returns the list of cell indices occupied by a building with the given
+ * anchor (top-left) at anchorIdx. Returns null if any cell would be out of bounds.
+ */
+export function getOccupiedCells(anchorIdx, buildingId) {
+  const size   = getBuildingSize(buildingId);
+  const ancRow = Math.floor(anchorIdx / GRID_SIZE);
+  const ancCol = anchorIdx % GRID_SIZE;
+
+  // Check fits on grid
+  if (ancRow + size > GRID_SIZE || ancCol + size > GRID_SIZE) return null;
+
+  const cells = [];
+  for (let dr = 0; dr < size; dr++) {
+    for (let dc = 0; dc < size; dc++) {
+      cells.push((ancRow + dr) * GRID_SIZE + (ancCol + dc));
+    }
+  }
+  return cells;
+}
+
 /** Base storage caps before any depots */
 const BASE_CAPS = { minerals: 1000, energy: 1000, oxygen: 1000 };
 
@@ -175,8 +201,9 @@ export const UNITS = {
 export function createGameState(playerName) {
   const baseLayout = {};
 
-  // Command Center at row 7, col 7 (centre of a 15×15 grid)
-  const centerCell = Math.floor(GRID_CELLS / 2); // = 112
+  // Command Center anchor at row 5, col 5 so 4×4 fits well in a 15×15 grid
+  // (rows 5-8, cols 5-8)
+  const centerCell = 5 * GRID_SIZE + 5; // = 80
   baseLayout[centerCell] = {
     buildingId: 'cc',
     level:      1,
@@ -290,7 +317,25 @@ export function placeBuilding(state, cellIndex, buildingId) {
   const bDef = BUILDINGS[buildingId];
   if (!bDef) return { success: false, error: 'Unknown building type' };
 
-  if (state.baseLayout[cellIndex]) return { success: false, error: 'Cell is already occupied' };
+  // Multi-cell footprint check
+  const cells = getOccupiedCells(cellIndex, buildingId);
+  if (!cells) return { success: false, error: 'Building does not fit here (too close to edge)' };
+
+  // Check all footprint cells are free (ignore anchor check for 'cc' during init)
+  const occupiedAnchors = new Set(
+    Object.keys(state.baseLayout).map(Number)
+  );
+  // Build a set of ALL cells currently occupied (anchor + ghost cells)
+  const allOccupied = new Set();
+  for (const [ancStr, cell] of Object.entries(state.baseLayout)) {
+    const anc = parseInt(ancStr, 10);
+    const occupied = getOccupiedCells(anc, cell.buildingId);
+    if (occupied) occupied.forEach(c => allOccupied.add(c));
+  }
+
+  for (const c of cells) {
+    if (allOccupied.has(c)) return { success: false, error: 'Not enough space for this building' };
+  }
 
   if (bDef.isUnique) {
     const exists = Object.values(state.baseLayout).some(c => c.buildingId === buildingId);
@@ -302,6 +347,7 @@ export function placeBuilding(state, cellIndex, buildingId) {
 
   deductCost(state.resources, cost);
 
+  // Store only at anchor cell
   state.baseLayout[cellIndex] = {
     buildingId,
     level: 1,

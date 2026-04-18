@@ -22,6 +22,7 @@ import {
 import {
   BUILDINGS, UNITS,
   GRID_SIZE, GRID_CELLS, CELL_PX,
+  getBuildingSize, getOccupiedCells,
   createGameState,
   generateResources, getResourceCaps, getResourceRates,
   canAfford, placeBuilding, upgradeBuilding, demolishBuilding,
@@ -39,6 +40,7 @@ let gameState          = null;    // In-memory game state
 
 let selectedBuildingId = null;    // Active build-menu selection
 let selectedCellIndex  = null;    // Selected grid cell
+let movingCellIndex    = null;    // Anchor cell of building being moved
 
 let gameLoopInterval   = null;    // setInterval handle for resource tick
 let saveTimeout        = null;    // debounce handle for auto-save
@@ -48,8 +50,8 @@ let opponentData       = null;    // { uid, data } of target opponent
 let battleState        = null;    // initBattle() result
 let deployedCounts     = {};      // units deployed in current attack
 
-// Fog-of-war visibility radius (Chebyshev distance) from any building
-const FOG_RANGE = 3;
+// Fog-of-war visibility radius (Chebyshev distance) from any occupied cell
+const FOG_RANGE = 2;
 
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -249,9 +251,44 @@ function gameTick() {
 // Grid Rendering
 // ════════════════════════════════════════════════════════════════════════════
 
+/**
+ * Map every building alias (buildingId) to its PNG prefix in assets/.
+ * The full path is: assets/{prefix}_lvl{level}.png
+ */
+const ASSET_PREFIX = {
+  cc:       'cc',
+  mine:     'mineral_extractor',
+  solar:    'solar_arra',
+  oxy:      'oxygen_farm',
+  depot:    'storage_depot',
+  turret:   'defense_turret',
+  barracks: 'barrack',
+};
+
+/** Return the PNG src for a building at a given level. */
+function buildingImgSrc(buildingId, level) {
+  const prefix = ASSET_PREFIX[buildingId] || buildingId;
+  return `assets/${prefix}_lvl${level}.png`;
+}
+
+/** Build a helper map: cellIndex -> anchorIndex (for ghost/occupied cells) */
+function buildOccupiedMap() {
+  const map = {}; // cellIdx -> anchorIdx
+  for (const [ancStr, cell] of Object.entries(gameState.baseLayout)) {
+    const anc   = parseInt(ancStr, 10);
+    const cells = getOccupiedCells(anc, cell.buildingId);
+    if (!cells) continue;
+    for (const c of cells) map[c] = anc;
+  }
+  return map;
+}
+
 function renderGrid() {
   const grid = document.getElementById('game-grid');
   grid.innerHTML = '';
+
+  // Build occupied map (all cells including ghost footprint)
+  const occupiedMap = buildOccupiedMap();
 
   for (let i = 0; i < GRID_CELLS; i++) {
     const cell = document.createElement('div');
@@ -262,99 +299,108 @@ function renderGrid() {
     cell.addEventListener('mouseenter', () => onCellHover(i));
     cell.addEventListener('mouseleave', onCellLeave);
 
-    populateCellDOM(cell, i);
+    // Ghost cells (part of a building's footprint but not the anchor) get hidden
+    const anchorIdx = occupiedMap[i];
+    if (anchorIdx !== undefined && anchorIdx !== i) {
+      // This is a ghost cell — make it invisible but keep it in the grid
+      cell.classList.add('ghost-cell');
+    }
+
     grid.appendChild(cell);
   }
 
+  // Now render buildings (as absolutely-positioned spans over gridarea)
+  renderBuildingOverlays();
   updateFogOfWar();
   sizeEffectCanvas();
 }
 
-/** Re-render a single cell's inner DOM without rebuilding the whole grid. */
-function updateCell(index, animate = false) {
-  const el = document.querySelector(`[data-idx="${index}"]`);
-  if (!el) return;
-  el.classList.remove('has-building', ...Object.keys(BUILDINGS).map(k => `building-${k}`));
-  populateCellDOM(el, index, animate);
-  updateFogOfWar();
-}
-
 /**
- * Map each building id to its DOM shape structure.
- * Returns the inner HTML for .cell-building.
+ * Place absolutely-positioned building overlays on the grid.
+ * Buildings span multiple grid cells via grid-column/row span CSS.
  */
-function buildingShapeHTML(buildingId, level, hpPct) {
-  const hpClass = hpPct > 60 ? '' : hpPct > 25 ? ' hp-mid' : ' hp-low';
-  const hpBar   = `<div class="building-hp-bar"><div class="hp-fill${hpClass}" style="width:${hpPct.toFixed(1)}%"></div></div>`;
-  const lvlBadge= `<div class="building-level">L${level}</div>`;
+function renderBuildingOverlays(animate = false, animateAnchor = null) {
+  // Remove existing overlays
+  document.querySelectorAll('.building-overlay').forEach(el => el.remove());
 
-  const shapes = {
-    cc: `
-      <div class="bshape">
-        <div class="bshape-crown"></div>
-      </div>`,
-    mine: `
-      <div class="bshape">
-        <div class="bshape-drill"></div>
-      </div>`,
-    solar: `<div class="bshape"></div>`,
-    oxy: `
-      <div class="bshape">
-        <div class="bshape-dome"></div>
-      </div>`,
-    depot: `<div class="bshape"></div>`,
-    turret: `
-      <div class="bshape">
-        <div class="bshape-barrel"></div>
-      </div>`,
-    barracks: `
-      <div class="bshape">
-        <div class="bshape-flag"></div>
-      </div>`,
-  };
+  const gridEl = document.getElementById('game-grid');
+  const CELL   = 44; // matches CSS .grid-cell width/height
 
-  return (shapes[buildingId] || `<div class="bshape"></div>`) + lvlBadge + hpBar;
+  for (const [ancStr, cell] of Object.entries(gameState.baseLayout)) {
+    const anc  = parseInt(ancStr, 10);
+    const bDef = BUILDINGS[cell.buildingId];
+    if (!bDef) continue;
+
+    const size   = getBuildingSize(cell.buildingId);
+    const ancRow = Math.floor(anc / GRID_SIZE);
+    const ancCol = anc % GRID_SIZE;
+
+    const hpPct = (cell.hp / (cell.maxHp || bDef.hp[cell.level - 1])) * 100;
+    const hpClass = hpPct > 60 ? '' : hpPct > 25 ? ' hp-mid' : ' hp-low';
+
+    const overlay = document.createElement('div');
+    overlay.className = `building-overlay building-${cell.buildingId}${cell.buildingId === 'cc' ? ' building-cc-anim' : ''}`;
+    if (animate && anc === animateAnchor) overlay.classList.add('building-construct');
+    overlay.dataset.anchor = anc;
+
+    // Position using grid coordinates (1-indexed)
+    overlay.style.gridColumn = `${ancCol + 1} / span ${size}`;
+    overlay.style.gridRow    = `${ancRow + 1} / span ${size}`;
+    overlay.style.zIndex     = '3';
+
+    const imgSrc = buildingImgSrc(cell.buildingId, cell.level);
+
+    overlay.innerHTML = `
+      <div class="bld-img-wrap">
+        <img src="${imgSrc}" alt="${bDef.name} Lv${cell.level}" class="bld-img" draggable="false"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+        <div class="bld-fallback" style="display:none;color:${bDef.color}">${bDef.emoji}</div>
+      </div>
+      <div class="building-level">L${cell.level}</div>
+      <div class="building-hp-bar"><div class="hp-fill${hpClass}" style="width:${hpPct.toFixed(1)}%"></div></div>`;
+
+    overlay.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (selectedBuildingId) return; // in build mode
+      if (movingCellIndex !== null) return; // handled by cell click
+      selectCell(anc);
+    });
+
+    gridEl.appendChild(overlay);
+  }
 }
 
-function populateCellDOM(cellEl, index, animate = false) {
-  const cell = gameState.baseLayout[index];
-  if (!cell) { cellEl.innerHTML = ''; return; }
-
-  const bDef  = BUILDINGS[cell.buildingId];
-  if (!bDef) return;
-
-  const hpPct = (cell.hp / (cell.maxHp || bDef.hp[cell.level - 1])) * 100;
-  cellEl.classList.add('has-building', `building-${cell.buildingId}`);
-
-  // Extra class for CC glow animation
-  const extraClass = cell.buildingId === 'cc' ? ' building-cc-anim' : '';
-  const animClass  = animate ? ' building-construct' : '';
-
-  cellEl.innerHTML = `
-    <div class="cell-building${extraClass}${animClass}">
-      ${buildingShapeHTML(cell.buildingId, cell.level, hpPct)}
-    </div>`;
+/** Re-render a single cell's building overlay without rebuilding the whole grid. */
+function updateCell(index, animate = false) {
+  // Rebuild overlays (lightweight since it's just DOM)
+  renderBuildingOverlays(animate, animate ? index : null);
+  updateFogOfWar();
 }
 
 /** Darken cells that are far from any placed building (fog of war). */
 function updateFogOfWar() {
-  const buildingIndices = Object.keys(gameState.baseLayout).map(Number);
+  // Collect all occupied cell indices (anchor + footprint)
+  const occupiedCells = [];
+  for (const [ancStr, cell] of Object.entries(gameState.baseLayout)) {
+    const anc   = parseInt(ancStr, 10);
+    const cells = getOccupiedCells(anc, cell.buildingId);
+    if (cells) occupiedCells.push(...cells);
+  }
 
   for (let i = 0; i < GRID_CELLS; i++) {
     const row = Math.floor(i / GRID_SIZE);
     const col = i % GRID_SIZE;
     let visible = false;
 
-    for (const bi of buildingIndices) {
-      const bRow = Math.floor(bi / GRID_SIZE);
-      const bCol = bi % GRID_SIZE;
-      // Chebyshev distance (diagonal counts as 1)
+    for (const ci of occupiedCells) {
+      const bRow = Math.floor(ci / GRID_SIZE);
+      const bCol = ci % GRID_SIZE;
       if (Math.max(Math.abs(row - bRow), Math.abs(col - bCol)) <= FOG_RANGE) {
         visible = true; break;
       }
     }
 
-    const el = document.querySelector(`[data-idx="${i}"]`);
+    const el = document.querySelector(`.grid-cell[data-idx="${i}"]`);
     if (el) el.classList.toggle('fog', !visible);
   }
 }
@@ -374,12 +420,55 @@ function sizeEffectCanvas() {
 // Cell Interaction
 // ════════════════════════════════════════════════════════════════════════════
 
+/** Return all cell indices currently covered by buildings (anchor + footprint). */
+function getAllOccupiedCells() {
+  const set = new Set();
+  for (const [ancStr, cell] of Object.entries(gameState.baseLayout)) {
+    const anc   = parseInt(ancStr, 10);
+    const cells = getOccupiedCells(anc, cell.buildingId);
+    if (cells) cells.forEach(c => set.add(c));
+  }
+  return set;
+}
+
 function onCellClick(index) {
+  // ── Move mode ───────────────────────────────────────────────────────────
+  if (movingCellIndex !== null) {
+    const movingCell = gameState.baseLayout[movingCellIndex];
+    if (!movingCell) { cancelMove(); return; }
+
+    // If clicked the same building, cancel
+    if (index === movingCellIndex) { cancelMove(); return; }
+
+    // Check if this anchor is valid
+    const bId  = movingCell.buildingId;
+    const footprint = getOccupiedCells(index, bId);
+    if (!footprint) { notify('Cannot place here — too close to edge', 'error'); return; }
+
+    // Check all footprint cells are free (ignoring the building's own old cells)
+    const oldCells = new Set(getOccupiedCells(movingCellIndex, bId) || []);
+    const occupied = getAllOccupiedCells();
+    const blocked  = footprint.some(c => occupied.has(c) && !oldCells.has(c));
+    if (blocked) { notify('Not enough space here', 'error'); return; }
+
+    // Move: remove from old anchor, add to new anchor
+    delete gameState.baseLayout[movingCellIndex];
+    gameState.baseLayout[index] = movingCell;
+
+    cancelMove();
+    renderGrid();
+    selectCell(index);
+    scheduleAutoSave();
+    notify('Building moved!', 'success');
+    return;
+  }
+
   if (selectedBuildingId) {
     // ── Place building ──────────────────────────────────────────────────
     const result = placeBuilding(gameState, index, selectedBuildingId);
     if (result.success) {
-      updateCell(index, true); // true = play construction animation
+      renderGrid();                        // Rebuild grid + ghost cells + overlays
+      renderBuildingOverlays(true, index); // With construction animation
       renderResourceBar();
       buildBuildMenu();
       scheduleAutoSave();
@@ -391,8 +480,11 @@ function onCellClick(index) {
     }
   } else {
     // ── Inspect / select ────────────────────────────────────────────────
-    if (gameState.baseLayout[index]) {
-      selectCell(index);
+    // Check if clicked cell is an anchor or a ghost footprint cell
+    const occupiedMap = buildOccupiedMap();
+    const anchor = occupiedMap[index];
+    if (anchor !== undefined) {
+      selectCell(anchor);
     } else {
       clearCellSelection();
     }
@@ -400,31 +492,83 @@ function onCellClick(index) {
 }
 
 function onCellHover(index) {
+  // Move mode: highlight footprint of hovered destination
+  if (movingCellIndex !== null) {
+    clearFootprintHighlight();
+    const bId = gameState.baseLayout[movingCellIndex]?.buildingId;
+    if (!bId) return;
+    const footprint = getOccupiedCells(index, bId);
+    if (!footprint) return;
+    const oldCells  = new Set(getOccupiedCells(movingCellIndex, bId) || []);
+    const occupied  = getAllOccupiedCells();
+    const isValid   = !footprint.some(c => occupied.has(c) && !oldCells.has(c));
+    footprint.forEach(c => {
+      const el = document.querySelector(`.grid-cell[data-idx="${c}"]`);
+      if (el) el.classList.add(isValid ? 'move-preview-ok' : 'move-preview-bad');
+    });
+    return;
+  }
+
   if (!selectedBuildingId) return;
-  const el = document.querySelector(`[data-idx="${index}"]`);
-  if (el && !gameState.baseLayout[index]) el.classList.add('place-preview');
+
+  clearFootprintHighlight();
+  const footprint = getOccupiedCells(index, selectedBuildingId);
+  if (!footprint) return;
+  const occupied  = getAllOccupiedCells();
+  const isValid   = !footprint.some(c => occupied.has(c));
+  footprint.forEach(c => {
+    const el = document.querySelector(`.grid-cell[data-idx="${c}"]`);
+    if (el) el.classList.add(isValid ? 'place-preview' : 'place-preview-bad');
+  });
 }
+
 function onCellLeave() {
-  document.querySelectorAll('.place-preview').forEach(c => c.classList.remove('place-preview'));
+  clearFootprintHighlight();
+}
+
+function clearFootprintHighlight() {
+  document.querySelectorAll(
+    '.place-preview, .place-preview-bad, .move-preview-ok, .move-preview-bad'
+  ).forEach(c => c.classList.remove('place-preview','place-preview-bad','move-preview-ok','move-preview-bad'));
 }
 
 function selectCell(index) {
   clearCellSelection();
-  const el = document.querySelector(`[data-idx="${index}"]`);
-  if (el) el.classList.add('selected');
+  // Highlight ALL cells of this building's footprint
+  const cell = gameState.baseLayout[index];
+  if (cell) {
+    const cells = getOccupiedCells(index, cell.buildingId) || [index];
+    cells.forEach(c => {
+      const el = document.querySelector(`.grid-cell[data-idx="${c}"]`);
+      if (el) el.classList.add('selected');
+    });
+    // Also highlight the overlay
+    document.querySelectorAll(`.building-overlay[data-anchor="${index}"]`)
+      .forEach(el => el.classList.add('selected'));
+  }
   selectedCellIndex = index;
   renderBuildingInfo(index);
 }
 
 function clearCellSelection() {
   document.querySelectorAll('.grid-cell.selected').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.building-overlay.selected').forEach(c => c.classList.remove('selected'));
   selectedCellIndex = null;
   document.getElementById('selected-info').innerHTML =
     '<p class="hint-text">Click a building to inspect it. Click an empty cell while a structure is selected to place it.</p>';
 }
 
+function cancelMove() {
+  movingCellIndex = null;
+  document.getElementById('game-grid').classList.remove('move-mode');
+  document.querySelectorAll('.building-overlay.moving').forEach(el => el.classList.remove('moving'));
+  clearFootprintHighlight();
+  // Re-render building info if a cell is still selected
+  if (selectedCellIndex !== null) renderBuildingInfo(selectedCellIndex);
+}
+
 function flashCell(index, type) {
-  const el = document.querySelector(`[data-idx="${index}"]`);
+  const el = document.querySelector(`.grid-cell[data-idx="${index}"]`);
   if (!el) return;
   el.classList.add(`flash-${type}`);
   setTimeout(() => el.classList.remove(`flash-${type}`), 600);
@@ -444,6 +588,7 @@ function renderBuildingInfo(index) {
   const upgCost   = nextLvl ? bDef.cost[cell.level] : null;
   const canUpg    = upgCost && canAfford(gameState.resources, upgCost);
   const hpPct     = Math.round((cell.hp / (cell.maxHp || bDef.hp[cell.level - 1])) * 100);
+  const imgSrc    = buildingImgSrc(cell.buildingId, cell.level);
 
   const statsRows = [];
   statsRows.push(`<div class="stat-row"><span>HP</span><span>${Math.ceil(cell.hp)} / ${bDef.hp[cell.level-1]} (${hpPct}%)</span></div>`);
@@ -455,10 +600,13 @@ function renderBuildingInfo(index) {
   if (bDef.dps)   statsRows.push(`<div class="stat-row"><span>DPS</span><span>${bDef.dps[cell.level-1]}</span></div>`);
   if (bDef.range) statsRows.push(`<div class="stat-row"><span>RANGE</span><span>${bDef.range[cell.level-1]} cells</span></div>`);
 
+  const isMoveActive = movingCellIndex === index;
+
   document.getElementById('selected-info').innerHTML = `
     <div class="building-info">
       <div class="info-header" style="border-color:${bDef.color}">
-        <span class="info-icon">${bDef.emoji}</span>
+        <img src="${imgSrc}" class="info-bld-img" alt="${bDef.name}"
+             onerror="this.style.display='none'" />
         <div>
           <h3>${bDef.name}</h3>
           <span class="info-level">Level ${cell.level} / ${bDef.maxLevel}</span>
@@ -473,6 +621,9 @@ function renderBuildingInfo(index) {
              <span class="cost">${formatCost(upgCost)}</span>
            </button>`
         : '<div class="max-level-badge">★ MAX LEVEL</div>'}
+      <button class="btn-move ${isMoveActive ? 'active' : ''}" onclick="toggleMoveMode(${index})">
+        ${isMoveActive ? '✕ CANCEL MOVE' : '✥ MOVE BUILDING'}
+      </button>
       ${cell.buildingId !== 'cc'
         ? `<button class="btn-demolish" onclick="confirmDemolish(${index})">☠ DEMOLISH</button>`
         : ''}
@@ -531,10 +682,11 @@ window.openUpgradeModal = function (index) {
   confirmBtn.onclick = () => {
     const result = upgradeBuilding(gameState, index);
     if (result.success) {
-      updateCell(index);
+      renderBuildingOverlays(); // Refresh PNGs (level changed)
       renderResourceBar();
       buildBuildMenu();
       renderBuildingInfo(index);
+      selectCell(index); // Re-highlight
       scheduleAutoSave();
       closeModal('upgrade-modal');
       notify(`${bDef.name} upgraded to Level ${gameState.baseLayout[index].level}!`, 'success');
@@ -555,8 +707,9 @@ window.confirmDemolish = function (index) {
   if (!confirm('Demolish this building? Resources are NOT refunded.')) return;
   const result = demolishBuilding(gameState, index);
   if (result.success) {
-    updateCell(index);
     clearCellSelection();
+    if (movingCellIndex === index) cancelMove();
+    renderGrid(); // Full grid rebuild to clean up ghost cells
     scheduleAutoSave();
     notify('Building demolished.', 'info');
   } else {
@@ -579,12 +732,17 @@ function buildBuildMenu() {
     const cost       = bDef.cost[0];
     const affordable = canAfford(gameState.resources, cost);
     const selected   = selectedBuildingId === bDef.id;
+    const imgSrc     = buildingImgSrc(bDef.id, 1);
 
     const item = document.createElement('div');
     item.className = `build-item ${affordable ? '' : 'unaffordable'} ${selected ? 'selected-build' : ''}`;
     item.id = `build-item-${bDef.id}`;
     item.innerHTML = `
-      <span class="build-icon" style="color:${bDef.color}">${bDef.emoji}</span>
+      <div class="build-thumb">
+        <img src="${imgSrc}" alt="${bDef.name}" class="build-thumb-img"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='inline'" />
+        <span style="display:none;color:${bDef.color}">${bDef.emoji}</span>
+      </div>
       <div class="build-info">
         <span class="build-name">${bDef.name}</span>
         <span class="build-cost">${formatCost(cost)}</span>
@@ -614,7 +772,26 @@ window.cancelBuild = function () {
   document.querySelectorAll('.build-item').forEach(i => i.classList.remove('selected-build'));
   document.getElementById('cancel-build-btn').style.display = 'none';
   document.getElementById('game-grid').classList.remove('build-mode');
-  document.querySelectorAll('.place-preview').forEach(c => c.classList.remove('place-preview'));
+  clearFootprintHighlight();
+};
+
+/** Enter / exit move mode for a building at anchorIndex. */
+window.toggleMoveMode = function (anchorIndex) {
+  if (movingCellIndex === anchorIndex) {
+    cancelMove();
+    return;
+  }
+  // Exit any existing move
+  if (movingCellIndex !== null) cancelMove();
+
+  movingCellIndex = anchorIndex;
+  document.getElementById('game-grid').classList.add('move-mode');
+  // Highlight overlay as 'moving'
+  document.querySelectorAll('.building-overlay.moving').forEach(el => el.classList.remove('moving'));
+  document.querySelectorAll(`.building-overlay[data-anchor="${anchorIndex}"]`)
+    .forEach(el => el.classList.add('moving'));
+  renderBuildingInfo(anchorIndex); // Refresh button state
+  notify('Click any valid empty area to move this building', 'info');
 };
 
 
