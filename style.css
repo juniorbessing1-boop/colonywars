@@ -505,11 +505,10 @@ html, body {
 
 /* ─── Game Layout ─── */
 .game-layout {
-  display: grid;
-  grid-template-columns: 220px 1fr 220px;
+  display: block; /* Switched to full-screen map with floating panels */
+  position: relative;
   flex: 1;
   overflow: hidden;
-  gap: 0;
 }
 
 /* ─── Panels ─── */
@@ -518,13 +517,21 @@ html, body {
   flex-direction: column;
   padding: 12px;
   overflow-y: auto;
-  border-radius: 0;
+  border-radius: var(--radius-lg);
   gap: 0;
-  background: rgba(255,255,255,0.95);
-  box-shadow: var(--shadow-panel);
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.4);
 }
-.build-panel  { border-right: 3px solid var(--green-light); }
-.info-panel   { border-left:  3px solid var(--green-light); }
+.build-panel {
+  position: absolute;
+  top: 15px; left: 15px; bottom: 15px; width: 240px; z-index: 100;
+}
+.info-panel {
+  position: absolute;
+  top: 15px; right: 15px; max-height: calc(100vh - 90px); width: 240px; z-index: 100;
+}
 
 .panel-header {
   display: flex;
@@ -787,19 +794,19 @@ html, body {
    ISOMETRIC GAME GRID
    ════════════════════════════════════════════════════════════ */
 .map-area {
-  flex: 1;
+  position: absolute;
+  inset: 0; /* fills game-layout completely */
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   overflow: hidden; /* Hide grid overflow if zoomed out */
-  position: relative;
 }
 
 .map-controls {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  bottom: 25px;
+  left: 270px; /* clear build panel */
   display: flex;
   flex-direction: column;
   gap: 8px;

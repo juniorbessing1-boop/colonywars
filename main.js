@@ -356,7 +356,6 @@ function renderBuildingOverlays(animate = false, animateAnchor = null) {
              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
         <div class="bld-fallback" style="display:none;color:${bDef.color}">${bDef.emoji}</div>
       </div>
-      <div class="building-level">L${cell.level}</div>
       <div class="building-hp-bar"><div class="hp-fill${hpClass}" style="width:${hpPct.toFixed(1)}%"></div></div>`;
 
     overlay.addEventListener('click', (e) => {
@@ -1062,17 +1061,25 @@ function getCachedImg(name, isUnit = false) {
   return CANVAS_IMG_CACHE[path];
 }
 
-/** Draw a low poly terrain grid background on canvas. */
+/** Draw a subtle terrain grid background on canvas (Unified grass). */
 function drawLPTerrain(ctx, W, cellSize) {
-  for (let row = 0; row < GRID_SIZE; row++) {
-    for (let col = 0; col < GRID_SIZE; col++) {
-      const idx = row * GRID_SIZE + col;
-      ctx.fillStyle = (idx % 2 === 0) ? LP_TILE_A : LP_TILE_B;
-      ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
-      ctx.strokeStyle = 'rgba(90,158,90,0.3)';
-      ctx.strokeRect(col * cellSize, row * cellSize, cellSize, cellSize);
-    }
+  // Draw base grass color
+  ctx.fillStyle = '#528c11';
+  ctx.fillRect(0, 0, W, W);
+
+  // Faint white gridlines
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i <= GRID_SIZE; i++) {
+    // Horizontals
+    ctx.moveTo(0, i * cellSize);
+    ctx.lineTo(W, i * cellSize);
+    // Verticals
+    ctx.moveTo(i * cellSize, 0);
+    ctx.lineTo(i * cellSize, W);
   }
+  ctx.stroke();
 }
 
 function drawIsometricSprite(ctx, src, x, y, width, height, isRubble = false) {
@@ -1101,12 +1108,7 @@ function drawSpriteUI(ctx, cx, cy, level, hpPct, w) {
   ctx.rotate(-45 * Math.PI / 180);
   ctx.scale(1, 2);
   
-  if (level !== '') {
-    ctx.font = 'bold 10px sans-serif';
-    ctx.fillStyle = '#fff';
-    ctx.fillText(`L${level}`, 0, -30);
-  }
-  
+  // Health Bar
   ctx.fillStyle = 'rgba(0,0,0,0.5)';
   ctx.fillRect(-w/2, -15, w, 4);
   ctx.fillStyle = hpPct > 0.5 ? '#43a047' : '#e53935';
