@@ -1084,7 +1084,13 @@ function drawIsometricSprite(ctx, src, x, y, width, height, isRubble = false) {
   ctx.rotate(-45 * Math.PI / 180);
   ctx.scale(1, 2); 
   if (isRubble) ctx.globalAlpha = 0.35;
-  ctx.drawImage(img, -width / 2, -height + 10, width, height);
+  
+  // Enforce aspect ratio correctly so buildings aren't squished down (tall buildings)
+  const ratio = img.naturalHeight / img.naturalWidth;
+  const drawH = width * ratio;
+  
+  // height/2 parameter here offsets the bottom center
+  ctx.drawImage(img, -width / 2, -drawH + (width * 0.25), width, drawH);
   ctx.restore();
 }
 

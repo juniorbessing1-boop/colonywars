@@ -20,9 +20,9 @@ export const GRID_SIZE = 15;          // Grid is GRID_SIZE × GRID_SIZE cells
 export const GRID_CELLS = GRID_SIZE * GRID_SIZE;
 export const CELL_PX = 36;           // Pixels per cell on the attack canvas
 
-/** Returns the grid footprint size for a building (CC = 4, others = 3). */
+/** Returns the grid footprint size for a building (all buildings occupy 1 cell now). */
 export function getBuildingSize(buildingId) {
-  return buildingId === 'cc' ? 4 : 3;
+  return 1;
 }
 
 /**
@@ -30,20 +30,13 @@ export function getBuildingSize(buildingId) {
  * anchor (top-left) at anchorIdx. Returns null if any cell would be out of bounds.
  */
 export function getOccupiedCells(anchorIdx, buildingId) {
-  const size   = getBuildingSize(buildingId);
   const ancRow = Math.floor(anchorIdx / GRID_SIZE);
   const ancCol = anchorIdx % GRID_SIZE;
 
   // Check fits on grid
-  if (ancRow + size > GRID_SIZE || ancCol + size > GRID_SIZE) return null;
+  if (ancRow >= GRID_SIZE || ancCol >= GRID_SIZE) return null;
 
-  const cells = [];
-  for (let dr = 0; dr < size; dr++) {
-    for (let dc = 0; dc < size; dc++) {
-      cells.push((ancRow + dr) * GRID_SIZE + (ancCol + dc));
-    }
-  }
-  return cells;
+  return [anchorIdx];
 }
 
 /** Base storage caps before any depots */

@@ -1086,16 +1086,18 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
-  /* Counter-rotate to stand upright */
-  transform: rotateZ(45deg) rotateX(-60deg) scale(1.6);
+  padding: 0;
+  /* Counter-rotate and scale by sqrt(2) to perfectly match 1x1 tile diagonal */
+  transform: rotateZ(45deg) rotateX(-60deg) scale(1.42);
   transform-origin: center bottom;
 }
 
 .bld-img {
   width: 100%;
-  height: 100%;
+  height: auto;
+  min-height: 100%;
   object-fit: contain;
+  object-position: bottom center;
   image-rendering: pixelated;
   display: block;
   pointer-events: none;
