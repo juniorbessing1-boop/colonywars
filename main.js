@@ -1424,3 +1424,12 @@ window.logoutPlayer = async function () {
   await performSave();
   await logoutUser();
 };
+
+// Map Zoom
+let currentZoom = 1.15;
+window.zoomMap = function(dir) {
+  currentZoom += dir * 0.15;
+  currentZoom = Math.max(0.6, Math.min(2.5, currentZoom));
+  document.documentElement.style.setProperty('--map-zoom', currentZoom);
+};
+

@@ -146,7 +146,11 @@
 
       <!-- Center: Grid Map -->
       <main class="map-area">
-        <div class="grid-wrapper">
+        <div class="map-controls">
+           <button id="zoom-in-btn" class="zoom-btn" onclick="zoomMap(1)" title="Zoom In">+</button>
+           <button id="zoom-out-btn" class="zoom-btn" onclick="zoomMap(-1)" title="Zoom Out">−</button>
+        </div>
+        <div class="grid-wrapper" id="grid-wrapper">
           <canvas id="effect-canvas" class="effect-canvas"></canvas>
           <div id="game-grid" class="game-grid"></div>
         </div>

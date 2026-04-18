@@ -24,67 +24,35 @@
 
   /* Accent colours */
   --green:       #43a047;
-  --green-dark:  #2e7d32;
-  --green-light: #a5d6a7;
-  --green-pale:  #e8f5e9;
-
-  --amber:       #fb8c00;
-  --amber-dark:  #e65100;
-  --amber-light: #ffe0b2;
-
-  --red:         #e53935;
-  --red-dark:    #b71c1c;
-  --red-light:   #ffcdd2;
-
-  --blue:        #1e88e5;
-  --blue-light:  #bbdefb;
-
-  --purple:      #8e24aa;
-  --purple-light:#e1bee7;
-
-  --teal:        #00897b;
-  --teal-light:  #b2dfdb;
-
-  /* Building colours */
-  --bcolor-cc:       #ffd600;
-  --bcolor-mine:     #ff8f00;
-  --bcolor-solar:    #ffee58;
-  --bcolor-oxy:      #66bb6a;
-  --bcolor-depot:    #42a5f5;
-  --bcolor-turret:   #ef5350;
-  --bcolor-barracks: #ab47bc;
-
-  /* Text */
-  --text-dark:   #1b5e20;
-  --text-mid:    #388e3c;
-  --text-muted:  #81c784;
-  --text-white:  #ffffff;
-  --text-head:   #2e3d1f;
-
-  /* Shadows */
-  --shadow-sm:   0 2px 8px rgba(0,0,0,0.10);
-  --shadow-md:   0 4px 18px rgba(0,0,0,0.14);
-  --shadow-lg:   0 8px 36px rgba(0,0,0,0.18);
-  --shadow-panel:0 2px 12px rgba(30,60,20,0.12), 0 0 0 1px rgba(67,160,71,0.12);
-
-  /* Building fake-light shadow (bottom/right face) */
-  --building-shadow: rgba(0,0,0,0.28);
-  --building-side:   rgba(0,0,0,0.22);
-
-  /* Typography */
-  --font-head:   'Nunito', 'Poppins', sans-serif;
-  --font-body:   'Inter', sans-serif;
-
-  /* Borders */
-  --radius-sm:   8px;
-  --radius-md:   14px;
-  --radius-lg:   20px;
-  --radius-xl:   28px;
-
-  /* Transitions */
-  --trans-fast:  150ms ease;
-  --trans-med:   260ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  --trans-slow:  420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --bg-dark: #0a0e17;
+  --bg-1: #111822; /* Panels */
+  --bg-2: #1a2332; /* Sub-panels, inputs */
+  --bg-hover: #232f42;
+  
+  --primary: #3b82f6; /* Blueish theme color instead of original green for UI */
+  --primary-hover: #60a5fa;
+  
+  --border-light: rgba(255, 255, 255, 0.12);
+  --border-focus: rgba(59, 130, 246, 0.6);
+  
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  
+  --radius-sm: 6px;
+  --radius-med: 12px;
+  --radius-lg: 20px;
+  
+  --trans-fast: 0.15s ease;
+  --trans-med: 0.25s ease;
+  
+  --terrain-base: #5a9e5a;
+  --terrain-alt: #4a8e4a;
+  --map-zoom: 1.15;
 }
 
 /* ─── Reset & Base ─── */
@@ -819,26 +787,57 @@ html, body {
    ISOMETRIC GAME GRID
    ════════════════════════════════════════════════════════════ */
 .map-area {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: hidden; /* Hide grid overflow if zoomed out */
   position: relative;
-  padding: 20px 20px 30px;
+}
 
-  /* Isometric-lite perspective */
-  perspective: 900px;
+.map-controls {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+}
+
+.zoom-btn {
+  background: var(--bg-1);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+  transition: all var(--trans-fast);
+}
+
+.zoom-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--primary);
+  transform: translateY(-2px);
 }
 
 .grid-wrapper {
   position: relative;
   flex-shrink: 0;
   /* Diamond Isometric tilt */
-  transform: rotateX(60deg) rotateZ(-45deg) scale(1.15);
+  transform: rotateX(60deg) rotateZ(-45deg) scale(var(--map-zoom));
   transform-style: preserve-3d;
   transform-origin: center center;
   margin-top: 50px;
+  transition: transform 0.2s ease-out;
 }
 
 .effect-canvas {
@@ -860,6 +859,7 @@ html, body {
     0 4px 0 #4a8e4a,
     inset 0 0 0 1px rgba(255,255,255,0.2);
   position: relative;
+  transform-style: preserve-3d; /* CRITICAL FOR STANDING FIGURES */
 }
 
 /* Alternating tile colours for low poly terrain */
